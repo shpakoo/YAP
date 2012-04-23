@@ -1,7 +1,7 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 Sebastian Szpakowski, J.Craig Venter Institute.
+## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
 
@@ -44,6 +44,7 @@ parser = OptionParser()
 #parser.add_option("-q", "--quiet",
 #                  action="store_false", dest="verbose", default=True,
 #                  help="don't print status messages to stdout")
+
 parser.add_option("-I", "--input", dest="inputname",
                   help="load fasta FILE", metavar="FILE")
                   
@@ -53,13 +54,12 @@ parser.add_option("-s", "--start", type="int", dest="start",
 parser.add_option("-e", "--end", type="int", dest="end",
                   help="trim end position [default: %default]", metavar="N", default=20)
 
-
-
 (options, args) = parser.parse_args()
 
 #################################################
 ##		Begin
 ##
+
 inputfilename = options.inputname
 extension = inputfilename.strip().split(".")[-1]
 

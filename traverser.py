@@ -1,7 +1,7 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 Sebastian Szpakowski, J.Craig Venter Institute.
+## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
 
@@ -29,6 +29,10 @@ class	Node:
 		self.path = file
 		self.workpathid = file[1:].strip().split("_")[0]
 		self.label =  "_".join(file[1:].strip().split("_")[1:])
+		self.has_manifest = False		
+		if self.workpathid == "tep":
+			self.workpathid = file[1:].strip().split("_")[-1]
+			self.label =  "_".join(file[1:].strip().split("_")[1:-1])
 		
 		#### mapping type - path for files
 		self.inputs = defaultdict(set)
@@ -43,9 +47,13 @@ class	Node:
 		
 	
 	def	parseManifest(self):
-		fp = open("%s/%s.manifest" % (self.path, self.workpathid), "r")
-		lines=fp.readlines()
-		fp.close()
+		try:
+			fp = open("%s/%s.manifest" % (self.path, self.workpathid), "r")
+			lines=fp.readlines()
+			fp.close()
+			self.has_manifest=True
+		except:
+			lines = list()
 		counter=0
 		for line in lines:
 			line = line.strip("\n").split("\t")
@@ -184,7 +192,9 @@ outs = dict()
 
 for file in glob.glob("./S*_*"):
 	file = file.strip("./")
-	nodes [file] = Node(file)
+	tmp =  Node(file)
+	if tmp.has_manifest:
+		nodes [file] = tmp
 	
 	
 

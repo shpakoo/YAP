@@ -1,7 +1,7 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 Sebastian Szpakowski, J.Craig Venter Institute.
+## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
 
@@ -118,6 +118,9 @@ parser.add_option("-f", "--fasta", dest="fn_fasta", default="",
 parser.add_option("-l", "--list", dest="fn_list", default = "",
 				  help="load list FILE", metavar="FILE")
 				  
+parser.add_option("-n", "--names", dest="fn_names", default = "",
+				  help="load names FILE (optional)", metavar="FILE")				  
+				  
 parser.add_option("-g", "--groups", dest="fn_groups",
                   help="load group FILE", metavar="FILE")                  
 
@@ -136,12 +139,21 @@ groups = dict()
 for id, group in GeneralPurposeParser(options.fn_groups, sep="\t"):
 	groups[id] = group
 otpt = open(options.fn_output, "w")
-#scratch = open("%s.removed" % (options.fn_groups), "w" )
+scratch = open("%s.missing" % (options.fn_groups), "w" )
 
 if options.fn_fasta!="":
 	for head, seq in FastaParser(options.fn_fasta):
 		if groups.has_key(head):
 			otpt.write("%s\t%s\n" % (head, groups[head]))
+		else:
+			scratch.write("%s\n" % (head) )
+	if options.fn_names!=""	
+		for name, merged in GeneralPurposeParser(options.fn_names, sep="\t"):
+			for m in merged.split(","):
+				if groups.has_key(head):
+					otpt.write("%s\t%s\n" % (head, groups[head]))
+				else:
+					scratch.write("%s\n" % (head) )	
 	otpt.close()
 	
 elif options.fn_list!="":
@@ -155,7 +167,7 @@ elif options.fn_list!="":
 			otpt.write("%s\t%s\n" % (o, groups[o]))
 	
 	otpt.close()	
-
+scratch.close()
 
 #################################################
 ##		Finish

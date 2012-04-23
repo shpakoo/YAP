@@ -1,7 +1,7 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 Sebastian Szpakowski, J.Craig Venter Institute.
+## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
 
@@ -139,14 +139,14 @@ class	BufferedOutputHandler(Thread):
 		
 		def	collapseIDs(self, text ):
 			for id in self.ids:
-				if len(id)>4:
-					text = re.sub(id, "[{0}~]".format(id[:4]), text)
+				if len(id)>5:
+					text = re.sub(id, "[{0}~]".format(id[:5]), text)
 			return (text)	
 		
 		def flush(self):
 			while len(self.cache) > 0:
 				id, name, line = self.cache.popleft()
-				tag = "[{0}] {1:<20} > ".format( id[:4], name) 
+				tag = "[{0}] {1:<20} > ".format( id[:5], name) 
 				line = "{0!s}".format(line)
 				line = self.collapseIDs(line)
 				
@@ -195,22 +195,58 @@ class	GridTask(Thread):
 		self.templates["himem"]      = 'qsub -P %s -N jh.%s -cwd -pe threaded %s -l "himem" -M %s -m a  %s "%s" ' % (self.project, name, cpu, self.email, holdfor, command)	
 		self.templates["default"]	 = 'qsub -P %s -N jd.%s -cwd -M %s -m a %s "%s" ' % (self.project, name, self.email, holdfor,  command)
 		self.templates["fast"]       = 'qsub -P %s -N jf.%s -cwd -l "fast" -M %s -m a  %s "%s" ' % (self.project, name, self.email, holdfor, command)	
-		self.templates["medium"]       = 'qsub -P %s -N jm.%s -cwd -l "medium" -M %s -m a  %s "%s" ' % (self.project, name, self.email, holdfor, command)
-		self.templates["himemCHEAT"]      = 'qsub -P %s -N jh.%s -cwd -pe threaded %s -l "himem" -M %s -m a  %s "%s" ' % (self.project, name, 1, self.email, holdfor, command)	
-		
+		self.templates["medium"]     = 'qsub -P %s -N jm.%s -cwd -l "medium" -M %s -m a  %s "%s" ' % (self.project, name, self.email, holdfor, command)
+		self.templates["himemCHEAT"] = 'qsub -P %s -N jh.%s -cwd -pe threaded %s -l "himem" -M %s -m a  %s "%s" ' % (self.project, name, 1, self.email, holdfor, command)	
+		self.templates["mpi"]		 = 'qsub -P %s -N jP.%s -cwd -pe orte %s -M %s -m a  %s mpirun -np %s "%s" ' % (self.project, name, cpu, cpu, self.email, holdfor, command )
 		self.command = ""
 		
 		if self.templates.has_key(template):
 			self.command = self.templates[template]
 		else:
-			self.command = self.templates["default"]
+			queue = self.pickQ()
+			self.command = self.templates[queue]
 			
 		self.jobid=-1
 		self.completed=False	
 		
 		self.start()
 		
-				
+	def	pickQ(self):
+		command="qstat -g c" 
+		x = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE, cwd=self.cwd, close_fds=True )
+		out,err = x.communicate()
+		x.wait()
+		
+		queues = dict()
+		out = out.strip().split("\n")
+		for q in out[2:]:
+			queue, cqload, used, res, avail, total, acds, cdsu = q.split()
+			avail = float(avail)
+			total = float(total)
+			if total>0:
+				queues[queue] = avail/total
+		
+		for k in ("default.q", "medium.q", "fast.q", "himem.q"):
+			if queues[k]>0:
+				return k.split(".")[0]
+			
+		return "default"
+			
+		
+###
+# CLUSTER QUEUE                   CQLOAD   USED    RES  AVAIL  TOTAL aoACDS  cdsuE  
+# --------------------------------------------------------------------------------
+# 454.q                             0.00      0      0     40     40      0      0 
+# all.q                             -NA-      0      0      0      0      0      0 
+# default.q                         0.43    194      0    405    608     24      0 
+# ergatis.q                         0.00      0      0     16     16      0      0 
+# fast.q                            0.66     64      0      0     64      0      0 
+# himem.q                           0.00      0      0     64     64      0      0 
+# interactive.q                     0.10     27      0     45     72      0      0 
+# medium.q                          0.93    768      0      0    768      0      0 
+# troubleshooting.q                 0.60      0      0    276    276      0      0 
+###		
+		
 	def	run(self):
 		pool_open_files.acquire()
 		p = Popen(shlex.split(self.command), stdout=PIPE, stderr=PIPE, cwd=self.cwd, close_fds=True)
@@ -238,8 +274,7 @@ class	GridTask(Thread):
 			err= ("".join(p.stderr.readlines())).strip()	
 			p.stdout.close()
 			p.stderr.close()
-
-			tmp = "Following jobs do not exist: \n%s" % (gridtask)
+			tmp = "Following jobs do not exist or permissions are not sufficient: \n%s" % (gridtask)
 			self.completed = (err == tmp)	
 		return self.completed	
 		
@@ -357,7 +392,7 @@ class	DefaultStep(Thread):
 			BOH.register(self.workpathid)
 			###
 			
-			self.message("Initializing %s %s" % (self.workpathid, self.name))
+			#self.message("Initializing %s %s" % (self.workpathid, self.name))
 			
 			#### create directories if necessary
 			self.stepdir =""
@@ -381,7 +416,7 @@ class	DefaultStep(Thread):
 		tmp.sort()	
 		tmp = "\n".join(tmp)
 		
-		workpathid = hashlib.sha224(tmp).hexdigest()[0:4]
+		workpathid = hashlib.sha224(tmp).hexdigest()[0:5]
 		return (workpathid)
 				
 	def	getWorkPathId(self):	
@@ -389,7 +424,7 @@ class	DefaultStep(Thread):
 				
 	def	prepareDir(self):
 		### make step's directory
-		self.stepdir = "S%s_%s" % (self.workpathid, self.stepname,)
+		self.stepdir = "Step_%s_%s" % (self.stepname, self.workpathid)
 		
 		try:	
 			os.mkdir(self.stepdir)				
@@ -472,6 +507,8 @@ class	DefaultStep(Thread):
 			return "fasta"
 		elif extension == "fa":
 			return "fasta"
+		elif extension == "seq":
+			return "fasta"	
 			
 		elif extension == "qual":
 			return "qfile"
@@ -483,6 +520,8 @@ class	DefaultStep(Thread):
 			return "name"
 		elif extension == "groups":
 			return "group"
+		elif extension == "files":
+			return "file"
 		
 		### sge job files
 		elif re.search("po\d{3}", extension) != None:
@@ -716,16 +755,21 @@ class	SFFInfoStep(DefaultStep):
 			
 			k = "/usr/local/bin/sffinfo -s %s > %s.fasta" % (sff, sff)
 			self.message(k)
-			task = GridTask(template="medium", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
+			task = GridTask(template="pick", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
 			steps.append(task)
 			
 			k = "/usr/local/bin/sffinfo -q %s > %s.qual" % (sff, sff)
 			self.message(k)
-			task = GridTask(template="medium", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
+			task = GridTask(template="pick", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
 			steps.append(task)
 			
-			for s in steps:
-				s.wait()
+			k = "/usr/local/bin/sffinfo -f %s > %s.flow" % (sff, sff)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
+			steps.append(task)
+			
+		for s in steps:
+			s.wait()
 	
 class	MothurStep(DefaultStep):
 	def __init__(self, NM, nodeCPUs, INS, ARGS, PREV):
@@ -740,7 +784,7 @@ class	MothurStep(DefaultStep):
 	def	makeCall(self):
 		FORCE = self.getInputValue("force")
 		x = MOTHUR.getCommandInfo(self.stepname)
-		
+		#self.message(self.inputs)
 		if FORCE != None :
 			TYPES = FORCE.strip().split(",")
 		else:
@@ -798,16 +842,58 @@ class	MothurStep(DefaultStep):
 		if (parallel and self.nodeCPUs)>1:
 			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)
 		else:
-			task = GridTask(template="medium", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
+			task = GridTask(template="pick", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
 		
 		task.wait()
 		self.parseLogfile()
 		
 	def	parseLogfile(self):
 		for f in glob.glob("%s/*.logfile" % (self.stepdir)):
+			line = ""
 			for line in loadLines(f):
 				if line.find ("ERROR")>-1:
 					self.failed=True
+			
+			### last line
+			if line.find("quit()")==-1:
+				self.failed=True
+
+class	MothurSHHH(DefaultStep):
+	def __init__(self,  PREV):		
+		DefaultStep.__init__(self)
+		#self.setInputs(INS)
+		#self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("MPyro")
+		#self.nodeCPUs=nodeCPUs
+	 	self.start()
+		
+	def	performStep(self):
+		tasks = list()
+		
+		TOC = self.find("file")
+		flows = self.find("flow")
+		
+		TOC = loadLines("%s/%s" % (self.stepdir, TOC[0]))
+		TOC = [ ".".join(x.strip().split(".")[1:]) for x in TOC]
+			
+		for f in flows:
+			tmp = ".".join(f.split(".")[1:])
+			
+			if tmp in TOC:
+				call = "shhh.flows(flow=%s)" % (f)
+				k = "%smothur \\\"#%s\\\"" % (mothurpath, call)
+				task = GridTask(template="pick", name="Mpyro", command=k, cpu=1,  cwd = self.stepdir)
+				tasks.append(task)
+				
+			else:
+				self.message("skipping %s" % (f))  
+		
+		self.message("processing %s file(s)" % len(tasks))
+		
+		for task in tasks:
+			task.wait()
+			time.sleep(1)	
 		
 class	LUCYcheck(DefaultStep):
 	def __init__(self, nodeCPUs, PREV):
@@ -830,7 +916,7 @@ class	LUCYcheck(DefaultStep):
 		if self.nodeCPUs>2:
 			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
 		else:
-			task = GridTask(template="default", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+			task = GridTask(template="pick", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
 		task.wait()	
 		
 class	LUCYtrim(DefaultStep):	
@@ -850,7 +936,7 @@ class	LUCYtrim(DefaultStep):
 		
 		k = "python %s/fastAtrimmer.py -l %s %s %s " % (scriptspath, f.split(".")[0], f, q)
 		self.message(k)
-		task = GridTask(template="medium", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 		task.wait()
 
 class	MatchGroupsToFasta(DefaultStep):
@@ -869,9 +955,16 @@ class	MatchGroupsToFasta(DefaultStep):
 		f = f[0]
 		g = self.find("group")
 		g = g[0]
-		k = "python %s/MatchGroupsToFasta.py -f %s -g %s -o %s.matched.group" % (scriptspath, f, g, ".".join(g.split(".")[:-1]))
+		
+		n = self.find("name")
+		if len(n)>0:
+			n = "-n %s" % (n[0])
+		else:
+			n = ""
+		
+		k = "python %s/MatchGroupsToFasta.py -n %s -f %s -g %s -o %s.matched.group" % (scriptspath, n, f, g, ".".join(g.split(".")[:-1]))
 		self.message(k)	
-		task = GridTask(template="medium", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 		task.wait()	
 
 class	MatchGroupsToList(DefaultStep):
@@ -890,9 +983,11 @@ class	MatchGroupsToList(DefaultStep):
 		f = f[0]
 		g = self.find("group")
 		g = g[0]
+
+		
 		k = "python %s/MatchGroupsToFasta.py -l %s -g %s -o %s.matched.group" % (scriptspath, f, g, ".".join(g.split(".")[:-1]))
 		self.message(k)	
-		task = GridTask(template="medium", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 		task.wait()			
 			
 class	FileMerger(DefaultStep):
@@ -913,12 +1008,12 @@ class	FileMerger(DefaultStep):
 			if len(files)>0 and len(files)<25:
 				k = "cat %s > files_x%s.merged.%s" % (" ".join(files), len(files), t)
 				self.message(k)	
-				task = GridTask(template="medium", name="cat", command=k, cpu=1,  cwd = self.stepdir)
+				task = GridTask(template="pick", name="cat", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 			elif len(files)>=25:
 				k = "cat *.%s* > files_x%s.merged.%s" % (t, len(files), t)
 				self.message(k)	
-				task = GridTask(template="medium", name="cat", command=k, cpu=1,  cwd = self.stepdir)
+				task = GridTask(template="pick", name="cat", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 			#else:
 			#	self.failed=True
@@ -945,7 +1040,7 @@ class	FileSort(DefaultStep):
 			if len(files)>0:
 				k = "sort -n %s > files_x%s.sorted.%s" % (" ".join(files), len(files), t)
 				self.message(k)	
-				task = GridTask(template="medium", name="sort", command=k, cpu=1,  cwd = self.stepdir)
+				task = GridTask(template="pick", name="sort", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 		for task in tasks:
 			task.wait()
@@ -1005,7 +1100,7 @@ class	FileType(DefaultStep):
 				outname = "%s.%s" % (file, output)
 				k = "cp %s %s" % (file, outname)
 				self.message(k)	
-				task = GridTask(template="medium", name="sort", command=k, cpu=1,  cwd = self.stepdir)
+				task = GridTask(template="pick", name="sort", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 		for task in tasks:
 			task.wait()
@@ -1027,7 +1122,7 @@ class	CleanFasta(DefaultStep):
 		f = f[0]
 		k = "python %s/CleanFasta.py -i %s -o %s.dash_stripped.fasta" % (scriptspath,f, ".".join(f.split(".")[:-1]))
 		self.message(k)	
-		task = GridTask(template="medium", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 		task.wait()			
 		
 class	MakeNamesFile(DefaultStep):
@@ -1123,7 +1218,7 @@ class 	AlignmentSummary(DefaultStep):
 		self.message("summarizing an alignment in %s" % (f) )
 		k = "python %s/summarizeAlignment.py -P %s -t 500 -p %s -i %s -o %s.alsum" % (scriptspath, self.project, ref, f,f)
 		self.message(k)
-		task = GridTask(template="default", name=self.stepname, command=k, cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
 		task.wait() 	
 
 class	AlignmentPlot(DefaultStep):
@@ -1148,7 +1243,7 @@ class	AlignmentPlot(DefaultStep):
 		tmp.write("batch2(\"%s\", ref=\"%s\" )\n" % (f, ref))
 		tmp.close()
 		k = "R CMD BATCH alsum.r"
-		task = GridTask(template="default", name=self.stepname, command=k, cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
 		task.wait()
 		
 class	GroupRetriever(DefaultStep):
@@ -1236,7 +1331,7 @@ class	CDHIT_Mothurize(DefaultStep):
 		if len(clst)>0:
 			k = "python %sCDHIT_mothurize_clstr.py -c %s  %s %s" % (scriptspath, clst[0], nameswitch, modeswitch)	
 			self.message(k)
-			task = GridTask(template="medium", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
+			task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
 			task.wait()	
 			
 		else:
@@ -1268,7 +1363,7 @@ class	CDHIT_EST(DefaultStep):
 		if self.nodeCPUs>2:
 			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
 		else:
-			task = GridTask(template="medium", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+			task = GridTask(template="pick", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
 		task.wait()	
 
 class	R_defaultplots(DefaultStep):
@@ -1303,7 +1398,7 @@ class	R_defaultplots(DefaultStep):
 		k =	"R CMD BATCH script.r"	
 		
 		self.message(k)
-		task = GridTask(template="medium", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
 		task.wait()
 				
 class	R_OTUplots(DefaultStep):
@@ -1324,7 +1419,7 @@ class	R_OTUplots(DefaultStep):
 		for file in f:
 			if file.find("annotated.fasta")>0:
 				k = """grep \\\">\\\" %s | awk '{FS = \\\"|\\\"; OFS=\\\"\\\\t\\\"} {print $4, $5}' > %s.tab.txt""" % (file, file)
-				task = GridTask(template="medium", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
+				task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
 				tasks.append(task)
 				script.write("""makeBatch("%s.tab.txt")\n""" % (file))
 	
@@ -1336,7 +1431,7 @@ class	R_OTUplots(DefaultStep):
 		k =	"R CMD BATCH script.r"	
 		self.message(k)
 		
-		task = GridTask(template="medium", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
 		task.wait()				
 				
 class	R_rarefactions(DefaultStep):
@@ -1352,7 +1447,7 @@ class	R_rarefactions(DefaultStep):
 			f = self.find(k)
 		k =	"R CMD BATCH %srarefactions.R" % (scriptspath)	
 		self.message(k)
-		task = GridTask(template="medium", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
 		task.wait()					
 
 class	AlignmentTrim(DefaultStep):
@@ -1372,7 +1467,7 @@ class	AlignmentTrim(DefaultStep):
 		
 		k ="python %salignmentTrimmer.py %s -I %s" % (scriptspath, args, f)
 		self.message(k)
-		task = GridTask(template="medium", name=self.stepname, command=k, cpu=1,  dependson=list(), cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  dependson=list(), cwd = self.stepdir)
 		task.wait()	
 					
 class	AnnotateClusters(DefaultStep):
@@ -1407,7 +1502,7 @@ class	AnnotateClusters(DefaultStep):
 					if tax.find(dist)>-1 and tax.find("otu")==-1:
 						k = "python %sRetrieve.py %s %s %s %s %s > cdhit_%s_annotated.fasta" % (scriptspath, dist, l[0], tax, g[0], fasta, dist)
 						self.message(k)
-						task = GridTask(template="medium", name=self.stepname, command=k, cpu=1,  dependson=list(), cwd = self.stepdir)
+						task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  dependson=list(), cwd = self.stepdir)
 						tasks.append(task)
 			
 			for task in tasks:
@@ -1415,8 +1510,132 @@ class	AnnotateClusters(DefaultStep):
 				
 				
 		#self.failed=True
-							
+
+######		
+######	these are mostly for contaminant checking/metagenomcis		
+###########################################################							
+class	Bowtie1 (DefaultStep):
+	def __init__(self, nodeCPUs, INS, ARGS, PREV):		
+		DefaultStep.__init__(self)
+		self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("BOWTIE1aligner")
+		self.nodeCPUs=nodeCPUs
+		self.counter=0
+	 	self.start()
+		
+	def	performStep(self):
+		tasks = list()
+		
+		m1 = self.find("mate1")
+		m2 = self.find("mate2")
+		m3 = self.find("fasta")
+		
+		argstring = ""
+		for arg, val in self.arguments.items():
+			argstring = "%s %s %s " % (argstring, arg, val) 
+		
+		tasks = list()
+		self.message("processing %s file(s)..." % (len(m1)+len(m3)))
+		for f in m1:
+			name = ".".join(f.strip().split(".")[:-1])
+
+			if "%s.mate2" % (name) in m2:
+				k = "bowtie %s -1 %s.mate1 -2 %s.mate2 > %s.bowtie1alignment" % (argstring, name, name, name)
+		 		#self.message(k)
+		 		task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)	
+				tasks.append(task)
+			else:
+				self.message("skipping: %s" % (name))
 				
+		for f in m3:
+			name = ".".join(f.strip().split(".")[:-1])
+			k = "bowtie %s  %s > %s.bowtie1alignment" % (argstring, f, name)
+			self.message(k)
+			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)	
+			tasks.append(task)
+								
+		for task in tasks:
+			task.wait()	
+
+### remove spaces from header (i.e. keep first oken only)
+### and make all 50 base fragments (overlapping by 25)	
+
+class	TilingFasta(DefaultStep):
+	def __init__(self, INS, PREV):		
+		DefaultStep.__init__(self)
+		self.setInputs(INS)
+		#self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("TilingFasta")
+	 	self.start()
+		
+	def	performStep(self):
+		tasks = list()
+		f = self.find("fasta")
+		for file in f:
+			input = FastaParser("%s/%s" % (self.stepdir, file))
+			output = open("%s/%s.tile.fasta"% (self.stepdir, file), "w")
+			
+			for head, seq in input:
+				head = head.split()[0]
+				counter=1
+				while len(seq)>50:
+					tmphead = "%s:%s-%s" % (head, counter, counter+100)
+					tmpseq = seq[:50]
+					
+					seq = seq[25:]
+					counter+=25
+
+					
+					output.write(">%s\n%s\n" % (tmphead, tmpseq))
+			
+			output.close()
+
+class	ContaminantRemoval(DefaultStep):
+	def __init__(self, INS, ARGS, PREV):		
+		DefaultStep.__init__(self)
+		
+		self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("decontaminate")
+
+	 	self.start()	
+	 	
+	def	performStep(self):
+		tasks = list()
+
+		m1 = self.find("fasta")
+		filter = self.find("bowtie1alignment")
+		
+		argstring = ""
+		for arg, val in self.arguments.items():
+			argstring = "%s %s %s " % (argstring, arg, val) 
+		
+		tasks = list()
+
+		if len(filter)>1:
+			self.message("too many (%s) filters..." % (len(filter)))
+			self.failed = True
+			
+		else:
+			for file in m1:	
+			
+				k = "python %sMateFilter.py %s -i %s -f %s -t fasta" % (scriptspath, argstring, file, filter[0])
+				if len(m1)==1:
+					self.message(k)
+			
+				task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=1,  cwd = self.stepdir)
+				tasks.append(task)
+				
+				
+			for task in tasks:
+				task.wait()	
+
+
+	
 #################################################
 ##		Functions
 ##
@@ -1449,6 +1668,12 @@ def	init(id, e):
 	__projectid__ = id
 	__email__ = e
 
+def	getNext():
+	global __counter__
+	__counter__+=1
+	
+	return __counter__
+	
 #################################################
 ##		Arguments
 ##
@@ -1465,8 +1690,10 @@ scriptspath = "/usr/local/devel/ANNOTATION/sszpakow/YAP/scripts/"
 BOH = BufferedOutputHandler()
 MOTHUR = MothurCommandInfo(path=mothurpath)
 
-defaulttemplate = "himemCHEAT"
-maxopenfiles = 400
+defaulttemplate = "himem"
+maxopenfiles = 200
+__counter__ = 0
+
 pool_open_files = BoundedSemaphore(value = maxopenfiles) 
 
 #################################################

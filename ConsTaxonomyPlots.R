@@ -1,65 +1,28 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 Sebastian Szpakowski, J.Craig Venter Institute.
+## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
-
-
-### verify that all required packages are installed	
-#installme=function()
-#{
-#	userdir <- unlist(strsplit(Sys.getenv("R_LIBS_USER"), .Platform$path.sep))[1L]
-#	print (userdir)
-#	m <- getCRANmirrors(all = FALSE, local.only = FALSE)
-#	m$counter = 1:nrow(m)
-#	res = min(m$counter[m$CountryCode=="us"])
-#	URL <- m[res, "URL"]
-#	repos <- getOption("repos")
-#	repos["CRAN"] <- gsub("/$", "", URL[1L])
-#	options(repos = repos)
-#	install.packages("ade4", dependencies=FALSE)
-#	install.packages("RColorBrewer",  dependencies=FALSE)
-#	install.packages("fdrtool",  dependencies=FALSE)
-#}
-#
-#done=FALSE
-#try(
-#	{	
-#		library(ade4)
-#		library(fdrtool)
-#		library(RColorBrewer)
-#		done=TRUE
-#	},
-#silent=TRUE)
-#if (! done)
-#{
-#	installme()
-#}
-###
-
 
 library(fdrtool)
 library(RColorBrewer)
 library(ade4)
+library(vegan)
+library(randomForest)
+library(gplots)
 
 collookup=function(x, annotation, column="SampleID")
 {
-	val = annotation[annotation$SampleID==x, column] 
-	
+	val = annotation[annotation$SampleID==x, column] 	
 	library(RColorBrewer)
-	
 	allvals = sort(unique(annotation[, column]))
 	#mypalette <- colorRampPalette(brewer.pal(12, "Paired"), space="rgb")
 	mypalette = rainbow(length(allvals))
-
 	return (mypalette[allvals == val])
 }
 
-
 getRandomColors=function(num)
 {
-	
-	
 	if (num==1)
 	{
 		if (exists ( ".colorcounter" , env = .GlobalEnv))
@@ -145,6 +108,17 @@ dist.binary = function(x, ... )
 	return (dist(x, method="binary", ...))
 }
 
+fundist= function(x, ... )
+{
+	return (vegdist(x, method="bray", ...))
+}
+
+funhclust = function(x, ... )
+{
+	return (hclust(x, method="average", ...))
+}
+
+
 makeLevelDataset=function(dataset, level=4, cumulative = FALSE)
 {
 	if (! cumulative)
@@ -199,16 +173,29 @@ makeHeatMap=function(dataset, annotation, highlight="SampleID", main="Heatmap", 
 
 	tmp = prepareDataset(dataset)
 	
-	#library(RColorBrewer)
-	#mypalette<-(brewer.pal(9, "Oranges"))
 	mypalette <- colorRampPalette(c("blue","yellow", "red"), space="rgb")
 	mypalette = mypalette(20)
-	
-	#sumsfilter = (apply(tmp, 1, sum)>1)
-	tmp = log10(tmp + 0.01)
-	sumsfilter = ( abs(apply(tmp, 1, sd) / apply(tmp, 1, mean))  > 0.01)
-	#sumsfilter = (abs(apply(tmp, 1, sd))> 0.25)
+
+	#### normalize	
+	if (perc)
+	{
+		for (k in 1:ncol(tmp))
+		{
+			### the dataset is per taxon level!
+			### i.e. NOT cummulative  
+			tmp[,k] = tmp[,k]/sum(tmp[,k])
+		}
+		lab = paste(round(seq(0,max(tmp*100), length.out=11),0), "%")
+		at = seq(0,max(tmp), length.out=11)	
 		
+		sumsfilter = (apply(tmp, 1, sd)>0.01)	
+	}
+	else
+	{
+		sumsfilter = (apply(tmp, 1, sd)>0)
+	}
+	
+	
 	if (sum(sumsfilter)<3)
 	{
 		plot(0,0, axes=FALSE, type="n", xlab="", ylab="", main=paste(main, "nothing to plot", sep="\n") )
@@ -216,20 +203,7 @@ makeHeatMap=function(dataset, annotation, highlight="SampleID", main="Heatmap", 
 	
 	else
 	{
-		
-		if (perc)
-		{
-			for (k in 1:ncol(tmp))
-			{
-				### the dataset is per taxon level!
-				### i.e. NOT cummulative  
-				tmp[,k] = tmp[,k]/sum(tmp[,k])
-			}
-			lab = paste(round(seq(0,max(tmp*100), length.out=11),0), "%")
-			at = seq(0,max(tmp), length.out=11)
 	
-		}
-		
 		tmp = tmp[sumsfilter,]		
 		tmp = data.matrix(tmp)
 		tmp = t(tmp)
@@ -241,17 +215,17 @@ makeHeatMap=function(dataset, annotation, highlight="SampleID", main="Heatmap", 
 		minianno = annotation[,c("SampleID", highlight)]
 		legendstuff = merge(legendstuff, minianno, by="SampleID", all.x=T, all.y=F)
 		legendstuff = aggregate(legendstuff, list(legendstuff[,highlight]), unique)
+	
+		description = paste(main, ifelse(perc, "OTUs normalized per sample", "Raw counts"), "Bray-Curtis, Average Linkage", sep="\n")
 		
-		# print (names(legendstuff))
-# 		print (legendstuff[,highlight])
-# 		print (legendstuff$fill)
+		#heatmap(tmp, col = mypalette, margins=c(20,20), keep.dendro=T, distfun = fundist, hclustfun = funhclust, scale=NULL, RowSideColors=colors, xlab="taxons", ylab="samples", main=paste(main, sep="\n"))
+		#legend("left", legend = legendstuff[,highlight], fill = legendstuff$fill, col = legendstuff$fill, cex=0.5)
+	
+		#heatmap.2( xlab="taxons", ylab="samples", main=paste(main, sep="\n"))
+		heatmap.2(tmp, margins=c(25,5), distfun = fundist, hclustfun = funhclust, col=mypalette, RowSideColors=colors, trace="none", scale="none", tracecol="white", main = description)
 		
-		
-
-		heatmap(tmp, col = mypalette, margins=c(20,20), keep.dendro=T, distfun = dist, hclustfun = hclust, scale=NULL, RowSideColors=colors, xlab="taxons", ylab="samples", main=paste(main, sep="\n"))
-		#heatmap(log10(tmp+0.00001), col = mypalette, margins=c(10,10), keep.dendro=T, distfun = dist, hclustfun = hclust, scale=NULL,RowSideColors=colors, xlab="taxons", ylab="samples", main=paste(main, " [log10]", sep="-"))
-		#heatmap(tmp, col = mypalette, margins=c(10,10), keep.dendro=T, distfun = dist.binary, hclustfun = hclust, scale=NULL, RowSideColors=colors, xlab="taxons", ylab="samples", main=paste(main," binary distance", sep="-"))
-		legend("left", legend = legendstuff[,highlight], fill = legendstuff$fill, col = legendstuff$fill, cex=0.5)
+		legend("bottomleft", legend = legendstuff[,highlight], fill = legendstuff$fill, col = legendstuff$fill, cex=0.8, horiz=T )
+	
 	}
 }
 
@@ -508,7 +482,7 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 	#print (desc)
 	#print (column)	
 	pvals = apply(tmp[,names(tmp)%in% unlist(x[,2])], 1, getPvals, x[,2])
-	#print (pvals)
+	#print (names(pvals))
 	
 	###############
 	
@@ -584,7 +558,6 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 		otpt$lfdr = NA
 	}
 	
-	#print (names(otpt))
 	if (statsfilename != "")
 	{
 		write.table(otpt, paste(statsfilename, column, "stats.tab.txt", sep="." ), row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE )
@@ -597,6 +570,8 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 	tmpsd = tmpsd[order(fororder, decreasing=TRUE),]
 	
 	#### plot only topX and accumulate the rest to form "Other"
+	
+	
 	if (topmost < nrow(tmp))
 	{
 		tmpA = tmp[1:(topmost+1)    ,]
@@ -635,8 +610,6 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 	tmpA = tmpA[rev(1:nrow(tmpA)),]	
 	tmpsdA = tmpsdA[rev(1:nrow(tmpsdA)),]	
 	
-	#print (tmpA)
-	
 	#cols = getColors(row.names(tmpA))
 	
 	barx = barplot(tmpA, 
@@ -647,7 +620,7 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 			beside=TRUE,
 			horiz=TRUE, 
 			las=1,
-			xlim = c(0,2*max(at)),
+			xlim = c(0,2.5*max(at)),
 			args.legend=list(cex=0.8, bg="ivory", title=legendtitle))
 	
 	
@@ -656,6 +629,7 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 	axis(1, at=at, lab=lab, las=3)
 	ticks = (1:ncol(tmpA))*(nrow(tmpA)+1) -  nrow(tmpA)/2
 	axis(2, pos=0, at=ticks, lab=rep("",length(ticks)), lwd=5, col="gray80")
+	
 	
 	####repeat)
 	par(new=TRUE)
@@ -668,9 +642,43 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 			beside=TRUE,
 			horiz=TRUE, 
 			las=1,
-			xlim = c(0,2*max(at)),
+			xlim = c(0,2.5*max(at)),
 			args.legend=list(cex=0.8, bg="ivory", title=legendtitle))	
+	
+	
+			
 	invisible (list(means = tmpA, sds=tmpsdA))		
+	
+	#### pvalues and q values
+	
+	forlab = dimnames(tmpA)[[2]]
+	forlab = data.frame(x = 1:length(forlab), taxon=forlab)
+	pvals = otpt[otpt$taxon %in% forlab$taxon, c("taxon", "pval", "qval")]
+	forlab = merge(forlab, pvals, by="taxon", all.x=FALSE, all.y=FALSE, sort=FALSE)
+	
+	if (length(dimnames(tmpA)[[2]]) == nrow(forlab))
+	{
+		labs = c(round(forlab$pval,4))
+	}
+	else
+	{
+		labs = c(1, round(forlab$pval,4))
+	}
+	labs = unlist(lapply(labs, function(x) { ifelse( !is.na(x) && x<0.05, paste("p = ", format(x, nsmall=4, scientific=FALSE, zero.print=TRUE)), "" ) } ))	
+	axis(2, pos=max(at)+0.15, at=ticks, lab=labs, lwd=0.5, col="gray90", las=2, cex.axis=1)
+	
+	if (length(dimnames(tmpA)[[2]]) == nrow(forlab))
+	{
+		labs = c(round(forlab$qval,4))
+	}
+	else
+	{
+		labs = c(1, round(forlab$qval,4))
+	}	
+	labs = unlist(lapply(labs, function(x) { ifelse( !is.na(x) && x<0.05, paste("q = ", format(x, nsmall=4, scientific=FALSE, zero.print=TRUE)), "" ) } ))
+	axis(4, pos=max(at)+0.15, at=ticks, lab=labs, lwd=0.5, col="gray90", las=2, cex.axis=1)
+
+
 	
 }
 
@@ -858,6 +866,8 @@ comparisonPlot = function(dataset, annotation, desc, column, columnb, funcname="
 	ticks = (1:ncol(tmpA))*(nrow(tmpA)+1) -  nrow(tmpA)/2
 	axis(2, pos=1.5*min(at), at=ticks, lab=rep("",length(ticks)), lwd=5, col="gray80")
 	axis(2, pos=0 , at=ticks, lab=rep("",length(ticks)), lwd=5, col="gray80")
+	
+	print (names(tmpA))
 	
 	####repeat)
 	par(new=TRUE)
@@ -1081,7 +1091,6 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 		origannotation = origannotation[order(FIXORDER$undo),]
 		origannotation = findRanges(origannotation)
 		
-
  	} 
  	
  	if (nrow(origdataset)==0)
@@ -1098,14 +1107,14 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 	{
 		cat (taxon, "\n", sep="")
 		x = makeLevelDataset(origdataset, getLevel(taxon), cumulative=TRUE)	
+		
+		
 		if (norm)
 		{
 			for (k in 4:ncol(x))
 			{
 				x[,k] = x[,k]/sum(x[,k])
 			}
-
-				
 
 		}
 		
@@ -1119,7 +1128,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 		{
 			cat ("HEAT:")
 			filename = paste(fileprefix, "TAX", taxon, "HEAT.pdf", sep=".")
-			pdf (filename, paper="special", width=max(10,0.01*nrow(x)), height=max(10,0.01*nrow(x)))
+			pdf (filename, paper="special", width= 10 + 0.1 * nrow(x), height= 10 + 0.1 * ncol(x))
 			#pdf (filename, paper="special", width=max(20), height=max(20))
 			
 			for (category in categories)
@@ -1135,7 +1144,17 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 				
 					mainlabel = paste("Taxon: ", taxon, ", samples grouped by: ", category, sep="")
 					
-					makeHeatMap(curdata, curanno, category, mainlabel, perc=TRUE)
+					if (norm)
+					{
+						makeHeatMap(curdata, curanno, category, mainlabel, perc=FALSE)
+					}
+					else
+					{
+						makeHeatMap(curdata, curanno, category, mainlabel, perc=TRUE)
+						makeHeatMap(curdata, curanno, category, mainlabel, perc=FALSE)
+					}
+					
+					
 				}
 	
 			} 	
@@ -1194,7 +1213,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 			cat ("Profl.:")
 			filename = paste(fileprefix,"TAX", taxon, "PROFILE.pdf", sep=".")
 			filename2 = paste(fileprefix,"TAX", taxon, sep=".")
-			pdf (filename, paper="special", width=12, height=9)
+			pdf (filename, paper="special", width=12, height=20)
 			par(mar=c(5,14,4,2))
 			for (category in categories)
 			{
@@ -1206,7 +1225,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 				if (ncol(curdata)>3)
 				{
 					mainlabel = paste("Taxon: ", taxon, ", samples grouped by: ", category, sep="")
-					profilePlot(curdata, curanno, mainlabel, category, topmost=10, legendtitle=category, statsfilename = filename2)		
+					profilePlot(curdata, curanno, mainlabel, category, topmost=20, legendtitle=category, statsfilename = filename2)		
 				}
 			} 	
 			par(mar=c(5, 4, 4, 2))
@@ -1238,7 +1257,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 							curdata = x[,names(x) %in% c("label", "depth", "taxonid", curanno$SampleID),]
 							if (ncol(curdata)>3)
 							{				
-								dataset = comparisonPlot(curdata, curanno, paste("taxon:", taxon), h, g, funcname="diff", topmost=10,  perc=FALSE, legendtitle = paste(h), ordervars = c())
+								dataset = comparisonPlot(curdata, curanno, paste("taxon:", taxon), h, g, funcname="diff", topmost=15,  perc=FALSE, legendtitle = paste(h), ordervars = c())
 								
 								if (nrow(dataset)==0)
 								{
@@ -1285,7 +1304,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 							if (ncol(curdata)>3)
 							{
 								cat ("\tdiff ", g, " [", paste(tocompare, collapse="-", sep="") ,"] per ", h, " [", paste(per[1:min(5, length(per))], collapse=", ", sep="") , "]", sep="")
-								dataset = comparisonPlot(curdata, curanno, paste("taxon:", taxon), h, g, funcname="diff", topmost=10,  perc=TRUE , legendtitle = paste(h), ordervars = c())
+								dataset = comparisonPlot(curdata, curanno, paste("taxon:", taxon), h, g, funcname="diff", topmost=15,  perc=TRUE , legendtitle = paste(h), ordervars = c())
 								
 								if (nrow(dataset)==0)
 								{
@@ -1310,7 +1329,6 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 			cat("\n")
 		}	
 		
-	
 	}
 }	
 
@@ -1350,6 +1368,8 @@ makeDebugBatchOfPlots=function(annotationfilename, constaxonomyfilename, filepre
 		}
 
 		annotation = origannotation[origannotation$SampleID %in% names(x),]
+		
+		
 						
 	}
 }	

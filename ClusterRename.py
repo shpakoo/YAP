@@ -8,48 +8,20 @@
 
 #!/usr/bin/python
 #################################################
-## 	create or merge with existing names file an output from
-##	CD-HIT
+## rename anything with "uncultured" with a species that is most abundant in a cluster
 #################################################
 import sys
 from optparse import OptionParser
 from collections import defaultdict
 
 _author="Sebastian Szpakowski"
-_date="2011/01/01"
+_date="2012/03/30"
 _version="Version 1"
 
 #################################################
 ##		Classes
 ##
-	#################################################
-	### Iterator over input file.
-	### every line is converted into a dictionary with variables referred to by their 
-	### header name
-class 	GeneralPurposeParser:
-	def	__init__(self, file, skip=0, sep="\t"):
-		self.filename = file
-		self.fp = open(self.filename, "r")	
-		self.sep = sep
-		self.linecounter = 0
-		self.currline=""
-		
-	def	__iter__(self):
-		return (self)
-	
-	def	next(self):
-		otpt = dict()
-		for currline in self.fp:
-			currline = currline.strip().split(self.sep)
-			self.currline = currline
-			self.linecounter = self.linecounter + 1
-			return(currline)			
-		raise StopIteration
-					
-	def	__str__(self):
-		return "%s [%s]\n\t%s" % (self.filename, self.linecounter, self.currline)
-		
-		
+
 class	FastaLikeParser:
 	def	__init__ (self, x):
 		self.filename = x
@@ -146,25 +118,41 @@ class	FastaParser:
 #################################################
 ##		Functions
 ##
+def	findName(names):
+	tmp = defaultdict(int)
+	for n in names:
+		if n.lower().find("uncultured")==-1 and n.lower().find("associated")==-1:
+			n = "_".join(n.split("_")[1:])
+			n = "%s" % (n)
+			tmp[n]+=1
+	
+	if len(tmp.keys())>0:
+		otpt = defaultdict(list)	
+		for n,count in tmp.items():
+			otpt[count].append(n)
+			
+		keys = otpt.keys()
+		keys.sort()
+		keys.reverse()
+		newname = otpt[keys[0]]
+		return newname	
+	else:
+		return list()
+	
 
 #################################################
 ##		Arguments
 ##
 parser = OptionParser()
 
-parser.add_option("-c", "--cluster", dest="fn_clstr",
+parser.add_option("-c", "--clusters", dest="fn_clstr",
                  help="clustering from CDHIT", metavar="FILE")
 
-parser.add_option("-n", "--names", dest="fn_name", default ="",
+parser.add_option("-s", "--sequences", dest="fn_seqs", default ="",
                  help="names from CDHIT", metavar="FILE")
                  
-parser.add_option("-o", "--output_mode", dest="out_mode", default = "name",
-                 help="output mode, i.e. either output list or names files", metavar="FILE")
-                 
-#parser.add_option("-q", "--quiet",
-#                  action="store_false", dest="verbose", default=True,
-#                  help="don't print status messages to stdout")
-
+parser.add_option("-o", "--output", dest="fn_out", default ="",
+                 help="names from CDHIT", metavar="FILE")                 
 
 (options, args) = parser.parse_args()
 
@@ -173,76 +161,43 @@ parser.add_option("-o", "--output_mode", dest="out_mode", default = "name",
 ##
 
 names = defaultdict(set)
-outputnames = defaultdict(set)
+clusters = defaultdict(set)
+remapping = defaultdict(list)
 
-if options.fn_name != "" :
-	for id, desc in GeneralPurposeParser(options.fn_name, skip=0, sep="\t"):
-		[names[id].add(x) for x in desc.split(",")]
-				
+## parse clusters
 for clusterid, contents in FastaLikeParser(options.fn_clstr):
 	representative= ""
 	descendants = set()
 	for line in contents.strip().split("\n"):
-		id = line.split(">")[1].split("...")[0].split()[0]
+		id = line.split(">")[1].split("...")[0]
 		if line.endswith("*"):
 			representative = id
 		
 		### self is always a descendant of itself!
 		descendants.add(id)
-		[descendants.add(x) for x in  names[id]]	
+		[descendants.add(x) for x in  names[id]]
+	clusters[representative] = descendants
+
+### find new names
+for K in clusters:
+	if K.lower().find("uncultured")>-1 or K.lower().find("associated")>-1:
+		remapping[K] = findName(clusters[K])
+
+## rename fasta	
+otptfile = open(options.fn_out, "w")
+for head, seq in FastaParser(options.fn_seqs):
+	if len(remapping[head])>0:
+		newname = "%s_%s" % (head.split("_")[0], remapping[head][0])
+		print head, "->" , newname, remapping[head]
+
+	else:
+		newname = head
 		
-	outputnames[representative] = descendants
-			
-if options.out_mode =="name":
-	prefix = options.fn_clstr.strip().split("/")[-1]
-	otptfile = open("%s.name" % (prefix), "w")	
-	
-	for key, vals in outputnames.items():
-		otptfile.write("%s\t%s" % (key, key))
-		
-		vals.discard(key)
-		if len(vals)>0:
-			otptfile.write(",%s\n" % (",".join(list(vals))))
-		else:
-			otptfile.write("\n")
-		
-	otptfile.close()	
-	
-else:
-	otus = defaultdict(list)
-	prefix = options.fn_clstr.strip().split("/")[-1]
-	listfile = open("%s.list" % (prefix), "w" )
-	listfile.write("%s\t%s" % (options.out_mode, len(outputnames.keys() )))
-	
-	rafile =open("%s.rabund" % (prefix), "w")
-	rafile.write("%s\t%s" % (options.out_mode, len(outputnames.keys() )))
-	
-	safile = open("%s.sabund" % (prefix), "w")
-	safile.write("%s" % (options.out_mode))
-	
-	mx = 0
-	for key, vals in outputnames.items():
+	otptfile.write(">%s\n%s\n" % (newname, seq))	
+otptfile.close		
 		
 
-		otus[len(vals)].append(vals)
-		listfile.write("\t%s" % (",").join(list(vals)))
-		rafile.write("\t%s" % (len(vals)))
-		mx = max (mx, len(vals))
-	
-	safile.write("\t%s" % (mx) )
-	for x in range (max(otus.keys())):
-		x = x+1
-		safile.write("\t%s" % len(otus[x]))
-		
-	listfile.write("\n")	
-	rafile.write("\n")	
-	safile.write("\n")	
-	
-	
-	listfile.close()
-	rafile.close()
-	safile.close()	
-	
+
 
 #################################################
 ##		Finish

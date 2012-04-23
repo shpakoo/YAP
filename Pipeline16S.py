@@ -1,10 +1,8 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 Sebastian Szpakowski, J.Craig Venter Institute.
+## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
-
-
 
 #!/usr/bin/python
 #################################################
@@ -156,54 +154,86 @@ def	deconvolute():
 	forprocessing = InfoParser(options.fn_info)
 	DECONVOLUTION = list()
 	
+	if options.strictlevel==2:
+		bdiffs="0"
+		pdiffs="1"
+	else:
+		bdiffs="0"
+		pdiffs="0"
+		
 	for file in forprocessing.getFiles():
 		oligos = forprocessing.makeOligoFile(file)
-		inputs = {"sff": ["%s" % (file)]}
+		sffinputs = {"sff": ["%s" % (file)]}
 	
 		print oligos
 		# #### extract fasta and qual files
-		s1 = SFFInfoStep(inputs, dict(), list())	
+		
+		if options.useflows:
+			A = MothurStep("sffinfo", options.nodesize, sffinputs, {"flow":"T"}, list())
+			
+		else:
+			D = SFFInfoStep(sffinputs, dict(), list())	
 	
-		for oligofile in oligos:	
 	
+		for oligofile in oligos:
+			oligoinputs = {"oligos": ["../%s" % (oligofile)]}
+			
+			if options.useflows:
+				args = { 
+						"bdiffs": bdiffs, 
+						"pdiffs": pdiffs, 
+						"maxhomop":"7",
+						"maxhomop":"7", 
+						"minflows": "360", 
+						"maxflows":"720"
+				}		
+				B = MothurStep("trim.flows", options.nodesize, oligoinputs, args, [A])
+				C = MothurSHHH([B])
+				D = FileMerger("fasta,name,qfile", [C])
+				
 			#### deconvolution
-			inputs = {"oligos": ["../%s" % (oligofile)]}
 			args = {	"flip":getOligoFlip(oligofile), 
-						"bdiffs": "0", 
-						"pdiffs": "1", 
+						"bdiffs": bdiffs, 
+						"pdiffs": pdiffs, 
+						"minlength": "%s" % (options.minlength),
+						"maxlength": "2500",
 						"qtrim": "F", 
 						"maxambig":"0", 
-						"maxhomop":"7"}	
+						"maxhomop":"7"
+			}	
+			if options.useflows:
+				args["force"] =  "name,fasta,oligos"
+			
+			E = MothurStep("trim.seqs", options.nodesize, oligoinputs, args, [D])	
+			
+			if  options.useflows:
+				DECONVOLUTION.append(E)
+			
+			else:
+				#### generate trimming coordinates using LUCY
+				F = LUCYcheck(options.nodesize, [E])
+
+				#### trim the reads using LUCY-generated coordinates
+				G = LUCYtrim([F])
+						
+				DECONVOLUTION.append(G)
 	
-			s2 = MothurStep("trim.seqs", options.nodesize, inputs, args, [s1])	
-			
-			#### generate trimming coordinates using LUCY
-			s3 = LUCYcheck(options.nodesize, [s2])
-			
-			#### trim the reads using LUCY-generated coordinates
-			s4 = LUCYtrim([s3])
-			
-			#### unique seqs
-			DECONVOLUTION.append(s4)
-		
+	#sys.exit(0)
 	ALMOST_DONE = FileMerger("fasta,name,group,qfile", DECONVOLUTION)
 	READY = MatchGroupsToFasta(dict(), [ALMOST_DONE])
 	
 	return (READY)
 
 def	finalize(input):
-
 	clean = CleanFasta(dict(), [input])
 	
-	####### remove sequences that are too long, and with ambiguous bases 
-	args = {"maxlength" : "2500", 
-			"minlength" : "220",
-			"maxambig" : "0",
-			"force": "fasta,name,group"}
-			
+	####### remove sequences that are too short, and with ambiguous bases 
+	args = { "minlength" : "%s" % ( options.minlength ),
+			 "maxambig" : "0",
+			 "force": "fasta,name,group"}
 	clean2 = MothurStep("screen.seqs", options.nodesize, dict(), args, [clean])
 
-	OutputStep("PRE454", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", clean2)
+	OutputStep("PRE454", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", clean)
 
 	###################### CDHIT
 	#### unique and de-noise
@@ -231,14 +261,12 @@ def	finalize(input):
 	supplementary.append(CD_6)
 	###########################
 	
-	
-	
-	OutputStep("ALIGNED", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4)
+	OutputStep("ALIGNED", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4)	
 	
 	cleanCD = cleanup(CD_4)
 
 	OutputStep("CLEAN", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", cleanCD)
-
+	
 	clusterCD = CDHITCluster(cleanCD)
 	
 	x = plotsAndStats(clusterCD)
@@ -259,31 +287,45 @@ def	cleanup(input):
 			
 	s15 = MothurStep("remove.groups", options.nodesize, dict(), args, [input])
 	
-	####### remove sequences that are too short, and outside of the primer regions  
+	####### remove sequences that are too short (bad alignment?)  
 	args = {
-				"minlength" : "220", 
+				"minlength" : "%s" % (options.minlength), 
 				"maxambig" : "0",
-				"force" : "fasta,name,group" 
+				"force" : "fasta,name,group" ,
 			}
 	s16 = MothurStep("screen.seqs", options.nodesize, dict(), args, [s15])
 	
-	####### find and remove chimeric sequences  
-	args = {"force" : "fasta,reference"}
-	inputs = {"reference": ["%s/silva.bacteria.fasta" % options.dir_anno] }
-	s17 = MothurStep("chimera.slayer",options.nodesize, inputs, args, [s16])
-	s18 = MothurStep("remove.seqs",options.nodesize, dict(), dict(), [s17])
-	
+	####### find chimeric sequences  
+	toremove = list()
+	for ch in [ "uchime" ]:
+		### chimeras against reference
+		args = {"force" : "fasta,reference"}
+		inputs = {"reference": ["%s/silva.bacteria.fasta" % options.dir_anno] }
+		
+		A = MothurStep("chimera.%s" % (ch),options.nodesize, inputs, args, [s16])	
+		toremove.append(A)
+		
+		### chimeras against self
+		args ={"force": "name,group,fasta"}
+		inputs = {}
+		
+		A = MothurStep("chimera.%s" % (ch),options.nodesize, inputs, args, [s16])	
+		toremove.append(A)
+		
+	### merge all accnos files and remove ALL chimeras	
+	allchimeras = FileMerger("accnos", toremove)
+	s17 = MothurStep("remove.seqs",options.nodesize, dict(), dict(), allchimeras)
+
 	### primer cut
 	args = {
 				"s" : "1044", 
 				"e": "13127"
 			}
-	s18a = AlignmentTrim(dict(), args, s18)
+	s18a = AlignmentTrim(dict(), args, s17)
 	
 	####### remove sequence fragments, bad alignments (?) 
-	args = { "minlength" : "220",
+	args = { "minlength" : "%s" % (options.minlength),
 			 "force": "fasta,name,group"}
-			
 	s18b = MothurStep("screen.seqs", options.nodesize, dict(), args, [s18a])
 	
 	####### remove empty columns
@@ -291,8 +333,8 @@ def	cleanup(input):
 	s19 = MothurStep("filter.seqs",options.nodesize, dict(), args, [s18b])
 	
 	####### taxonomy
-	inputs = {	"reference": ["%s/trainset6_032010.rdp.fasta" % options.dir_anno],
-				"taxonomy": ["%s/trainset6_032010.rdp.tax" % options.dir_anno]
+	inputs = {	"reference": ["%s/trainset7_112011.pds.fasta" % options.dir_anno],
+				"taxonomy": ["%s/trainset7_112011.pds.tax" % options.dir_anno]
 			}
 			
 	args = {"iters" : "100"}
@@ -409,6 +451,18 @@ group.add_option("-a", "--annotations", dest="dir_anno", default="/usr/local/dev
                  help="directory that stores auxilliary files\n[%default]", metavar="annotations")
 group.add_option("-S", "--SAMPLE", dest="sampletimes", default=0, type="int",
                  help="perform sub.sampling of all reads based on the number of reads in smallest group. if 0 - all reads are used. if 1 - the sampling will be performed once, if 2 or more, then 2 or more independent samplings are going to be performed.\n[%default]", metavar="#")                 
+group.add_option("-m", "--minlen", dest="minlength", default=220, type="int",
+                 help="what is the minimum length of reads to process\n[%default]", metavar="#")                 
+group.add_option("-x", "--strict", dest="strictlevel", default=1, type="int",
+                 help="""how strict to be at deconvolution: 
+                 	1 very strict (barcode no mismatches, primer no mismatches) 
+                 	2 less strict (barcode no mismatches, primer 1 mismatch allowed)
+                 	[%default]""", metavar="#")                 
+
+group.add_option("-F", "--useFlows", dest="useflows", action="store_true", default=False,
+                 help="""if specified flows will be used and pyronoise will be employed. Otherwise qual values will be used with LUCY""", metavar="#") 
+
+
 parser.add_option_group(group)
 
 group = OptionGroup(parser, "Technical", description="could be useful sometimes")
@@ -427,7 +481,7 @@ if options.fn_info == "" or options.email == "" or options.project =="":
 	parser.print_help()
 	sys.exit(1)
 		
-init(options.project, "sszpakow@jcvi.org")
+init(options.project, options.email)
 
 ############################
 ######################
@@ -438,7 +492,6 @@ REF_1 = MakeNamesFile([REF])
 REF_2 = MakeGroupsFile([REF], "ref")
 REF_3 = MakeQualFile  ([REF], "40" )
 #############################
-
 
 supplementary = list()
 READY = deconvolute()
