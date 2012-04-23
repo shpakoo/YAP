@@ -147,13 +147,13 @@ if options.fn_fasta!="":
 			otpt.write("%s\t%s\n" % (head, groups[head]))
 		else:
 			scratch.write("%s\n" % (head) )
-	if options.fn_names!=""	
+	if options.fn_names!=""	:
 		for name, merged in GeneralPurposeParser(options.fn_names, sep="\t"):
 			for m in merged.split(","):
-				if groups.has_key(head):
-					otpt.write("%s\t%s\n" % (head, groups[head]))
+				if groups.has_key(m):
+					otpt.write("%s\t%s\n" % (m, groups[m]))
 				else:
-					scratch.write("%s\n" % (head) )	
+					scratch.write("%s\n" % (m) )	
 	otpt.close()
 	
 elif options.fn_list!="":
