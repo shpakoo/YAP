@@ -250,13 +250,9 @@ class	GridTask(Thread):
 	def	run(self):
 		pool_open_files.acquire()
 		p = Popen(shlex.split(self.command), stdout=PIPE, stderr=PIPE, cwd=self.cwd, close_fds=True)
+		out,err = p.communicate()
 		p.wait()
-		out= ("".join(p.stdout.readlines())).strip()
-		err= ("".join(p.stderr.readlines())).strip()		
 		try:
-			p.stdout.close()
-			p.stderr.close()
-
 			self.jobid = out.strip().split(" ")[2]	
 			self.wait()
 		except:
@@ -269,11 +265,9 @@ class	GridTask(Thread):
 		if not self.completed:	
 			gridtask = self.jobid
 			p = Popen(shlex.split("qstat -j %s" % gridtask), stdout=PIPE, stderr=PIPE, close_fds=True)
+			out,err = p.communicate()
 			p.wait()
-			out= ("".join(p.stdout.readlines())).strip()
-			err= ("".join(p.stderr.readlines())).strip()	
-			p.stdout.close()
-			p.stderr.close()
+			
 			tmp = "Following jobs do not exist or permissions are not sufficient: \n%s" % (gridtask)
 			self.completed = (err == tmp)	
 		return self.completed	
@@ -543,9 +537,8 @@ class	DefaultStep(Thread):
 				if self.removeinputs:
 					command = "unlink %s" % (file)
 					p = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE, cwd=self.stepdir, close_fds=True)	
+					out,err = p.communicate()
 					p.wait()
-					p.stdout.close()
-					p.stderr.close()
 
 				else:
 					self.message("kept %s" % file)
@@ -564,9 +557,8 @@ class	DefaultStep(Thread):
 				if ".".join(file) != newfilename:
 					k="mv %s %s" % (".".join(file), newfilename)
 					p = Popen(shlex.split(k), stdout=PIPE, stderr=PIPE, cwd=self.stepdir, close_fds=True)	
+					out,err = p.communicate()
 					p.wait()
-					p.stdout.close()
-					p.stderr.close()
 
 				self.outputs[self.determineType(newfilename)].add(newfilename)
 						
@@ -590,9 +582,8 @@ class	DefaultStep(Thread):
 				else:
 					command = "cp %s %s" % (file, tmp )
 				p = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE, cwd=self.stepdir, close_fds=True )	
+				out,err = p.communicate()
 				p.wait()
-				p.stdout.close()
-				p.stderr.close()
 				toreturn.append(tmp)		
 		#unique	
 		toreturn = set(toreturn)
@@ -698,9 +689,8 @@ class	FileImport(DefaultStep):
 								
 				p = Popen(shlex.split(k), stdout=PIPE, stderr=PIPE, cwd=self.stepdir, close_fds=True)
 				self.message(k)
+				out,err = p.communicate()
 				p.wait()
-				p.stdout.close()
-				p.stderr.close()
 				
 class	ArgumentCheck(DefaultStep):
 	def	__init__(self, SHOW, PREV):
