@@ -962,7 +962,7 @@ class	MatchGroupsToFasta(DefaultStep):
 		else:
 			n = ""
 		
-		k = "python %s/MatchGroupsToFasta.py -n %s -f %s -g %s -o %s.matched.group" % (scriptspath, n, f, g, ".".join(g.split(".")[:-1]))
+		k = "python %s/MatchGroupsToFasta.py %s -f %s -g %s -o %s.matched.group" % (scriptspath, n, f, g, ".".join(g.split(".")[:-1]))
 		self.message(k)	
 		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 		task.wait()	

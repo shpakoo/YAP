@@ -4,12 +4,9 @@
 ## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
-
-
-
-#!/usr/bin/python
 #################################################
-## 	A new program
+## 	A verification step to make sure
+##  that the groups file matches the fasta file
 #################################################
 import sys
 from optparse import OptionParser
@@ -149,7 +146,8 @@ if options.fn_fasta!="":
 			scratch.write("%s\n" % (head) )
 	if options.fn_names!=""	:
 		for name, merged in GeneralPurposeParser(options.fn_names, sep="\t"):
-			for m in merged.split(","):
+			### in a names file, the first ID in a list is the same as the cluster id.
+			for m in merged.split(",")[1:]:
 				if groups.has_key(m):
 					otpt.write("%s\t%s\n" % (m, groups[m]))
 				else:
