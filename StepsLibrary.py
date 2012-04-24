@@ -267,9 +267,11 @@ class	GridTask(Thread):
 			p = Popen(shlex.split("qstat -j %s" % gridtask), stdout=PIPE, stderr=PIPE, close_fds=True)
 			out,err = p.communicate()
 			p.wait()
+			#print err
+			#print out
 			
 			tmp = "Following jobs do not exist or permissions are not sufficient: \n%s" % (gridtask)
-			self.completed = (err == tmp)	
+			self.completed = (err.strip() == tmp)	
 		return self.completed	
 		
 	def	wait(self):
