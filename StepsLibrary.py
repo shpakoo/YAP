@@ -843,7 +843,8 @@ class	MothurStep(DefaultStep):
 		for f in glob.glob("%s/*.logfile" % (self.stepdir)):
 			line = ""
 			for line in loadLines(f):
-				if line.find ("ERROR")>-1:
+				### UCHIME throws an error when it does not find chimeras, even though it completes.
+				if line.find ("ERROR")>-1 and line.find("uchime")==-1:
 					self.failed=True
 			
 			### last line
@@ -873,19 +874,37 @@ class	MothurSHHH(DefaultStep):
 			tmp = ".".join(f.split(".")[1:])
 			
 			if tmp in TOC:
-				call = "shhh.flows(flow=%s)" % (f)
-				k = "%smothur \\\"#%s\\\"" % (mothurpath, call)
-				task = GridTask(template="pick", name="Mpyro", command=k, cpu=1,  cwd = self.stepdir)
-				tasks.append(task)
 				
+				### split tmp into 10,000 lines chunks
+				k = "split -l 7000 -a 3 %s %s.split." % (f, f)
+				task = GridTask(template="pick", name="MPyroSplit", command=k, cpu=1,  cwd = self.stepdir)
+				tasks.append(task)				
 			else:
 				self.message("skipping %s" % (f))  
 		
-		self.message("processing %s file(s)" % len(tasks))
+		self.message("splitting %s file(s)" % len(tasks))
 		
 		for task in tasks:
 			task.wait()
 			time.sleep(1)	
+		
+		################################################
+		tasks = list()
+		
+		for chunk in glob.glob("%s/*.split.*" % (self.stepdir)):
+			chunk = chunk.split("/")[-1]
+			#self.message(chunk)	
+			call = "shhh.flows(flow=%s)" % (chunk)
+			k = "%smothur \\\"#%s\\\"" % (mothurpath, call)
+			task = GridTask(template="pick", name="Mpyro", command=k, cpu=1,  cwd = self.stepdir)
+			tasks.append(task)
+				
+		self.message("processing %s file(s)" % len(tasks))
+		
+		for task in tasks:
+			task.wait()
+			time.sleep(1)		
+			
 		
 class	LUCYcheck(DefaultStep):
 	def __init__(self, nodeCPUs, PREV):

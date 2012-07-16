@@ -184,7 +184,7 @@ def	deconvolute():
 						"pdiffs": pdiffs, 
 						"maxhomop":"7",
 						"maxhomop":"7", 
-						"minflows": "360", 
+						"minflows":"360", 
 						"maxflows":"720"
 				}		
 				B = MothurStep("trim.flows", options.nodesize, oligoinputs, args, [A])
@@ -218,7 +218,7 @@ def	deconvolute():
 						
 				DECONVOLUTION.append(G)
 	
-	#sys.exit(0)
+#	sys.exit(0)
 	ALMOST_DONE = FileMerger("fasta,name,group,qfile", DECONVOLUTION)
 	READY = MatchGroupsToFasta(dict(), [ALMOST_DONE])
 	
