@@ -77,8 +77,9 @@ parser.add_option("-t", "--format", dest="file_format", default="fastq",
 ##		Begin
 ##
 
-names = [x.strip().split()[0].split(":")[0] for x in loadLines(options.fn_filter)]
-print names
+names = [x.strip().split()[0] for x in loadLines(options.fn_filter)]
+names = set(names)
+
 for file in options.fn_input.strip().split(","):
 	file_in = open(file, "r")
 	
@@ -89,7 +90,7 @@ for file in options.fn_input.strip().split(","):
 	outputs = list()
 	
 	for record in SeqIO.parse(file_in, options.file_format) :
-		
+		#print record.id
 		if record.id.split()[0] in names:
 			print "filtering out:", record.id
 		else:
