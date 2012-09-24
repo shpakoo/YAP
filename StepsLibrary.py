@@ -1288,7 +1288,7 @@ class	MatchGroupsToList(DefaultStep):
 		task.wait()			
 			
 class	FileMerger(DefaultStep):
-	def __init__(self, TYPES, PREV):
+	def __init__(self, TYPES, PREV, prefix="files"):
 		ARGS = 	{"types": TYPES}		
 		DefaultStep.__init__(self)
 		#self.setInputs(INS)
@@ -1296,6 +1296,7 @@ class	FileMerger(DefaultStep):
 		self.setPrevious(PREV)
 		self.setName("FILE_cat")
 		#self.nodeCPUs=nodeCPUs
+		self.prefix = prefix
 	 	self.start()
 		
 	def	performStep(self):
@@ -1303,12 +1304,12 @@ class	FileMerger(DefaultStep):
 		for t in self.getInputValue("types").strip().split(","):
 			files = self.find(t)
 			if len(files)>0 and len(files)<25:
-				k = "cat %s > files_x%s.merged.%s" % (" ".join(files), len(files), t)
+				k = "cat %s > %s_x%s.merged.%s" % (" ".join(files), self.prefix, len(files), t)
 				self.message(k)	
 				task = GridTask(template="pick", name="cat", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 			elif len(files)>=25:
-				k = "cat *.%s* > files_x%s.merged.%s" % (t, len(files), t)
+				k = "cat *.%s* > %s_x%s.merged.%s" % (t, self.prefix, len(files), t)
 				self.message(k)	
 				task = GridTask(template="pick", name="cat", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
@@ -2133,7 +2134,7 @@ class	CLC_Assemble(DefaultStep):
 				k = "/usr/local/packages/clc-ngs-cell/clc_novo_assemble -o %s.contigs.fasta %s -q %s" % (prefix, argstring, m1)
 				self.message(k)
 				
-				task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=cpus,  cwd = self.stepdir)
+				task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=cpus,  cwd = self.stepdir, debug=True)
 				task.wait()
 				
 				for file in glob.glob("%s/*.e*" % (self.stepdir)):
