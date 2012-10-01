@@ -4,7 +4,6 @@
 ## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
-#!/usr/bin/python
 #################################################
 ## 	A pipeline for cleaning up sff files and producing 
 ##	OTUs 
@@ -16,8 +15,8 @@ from collections import defaultdict
 from Queue import Queue
 
 _author="Sebastian Szpakowski"
-_date="2011/12/12"
-_version="Version 1"
+_date="2012/10/01"
+_version="Version 2"
 
 #################################################
 ##		Classes
@@ -241,7 +240,8 @@ def	finalize(input):
 					"b" : "8",
 					"aS": "1.0",
 					"g" : "1",
-					"M"	: "50000"
+					"M"	: "50000",
+					"T" : "60"
 				}
 	#### de-noise/unique collapse			
 	CD_1 = CDHIT_454(options.nodesize, args, [clean2])
@@ -254,14 +254,14 @@ def	finalize(input):
 	inputs = {"reference": ["%s/silva.bacteria.fasta" % options.dir_anno] }
 	args = {"flip":"t", "ksize": "9"}	
 	CD_4 = MothurStep("align.seqs", options.nodesize, inputs, args, [CD_3])
-
+	
 	#### plots (inconsequential) 
 	CD_5 = AlignmentSummary(dict(),[CD_4])
 	CD_6 = AlignmentPlot(dict(),[CD_5])
 	supplementary.append(CD_6)
 	###########################
 	
-	OutputStep("ALIGNED", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4)	
+	OutputStep("ALIGNED", "tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4)	
 	
 	cleanCD = cleanup(CD_4)
 
@@ -274,7 +274,7 @@ def	finalize(input):
 	ARGS = {"dist": "0.03"}
 	output = R_defaultplots(INS, ARGS, x)
 	output2 = AnnotateClusters(dict(), dict(), output)
-	
+		
 	return (output2)
 
 def	cleanup(input):
@@ -328,13 +328,16 @@ def	cleanup(input):
 			 "force": "fasta,name,group"}
 	s18b = MothurStep("screen.seqs", options.nodesize, dict(), args, [s18a])
 	
+	### build a tree
+	#s18b_tree = ClearcutTree({}, s18b)
+	
 	####### remove empty columns
 	args = {"vertical" : "T"}
 	s19 = MothurStep("filter.seqs",options.nodesize, dict(), args, [s18b])
 	
 	####### taxonomy
-	inputs = {	"reference": ["%s/trainset7_112011.pds.fasta" % options.dir_anno],
-				"taxonomy": ["%s/trainset7_112011.pds.tax" % options.dir_anno]
+	inputs = {	"reference": ["%s/trainset9_032012.pds.fasta" % options.dir_anno],
+				"taxonomy": ["%s/trainset9_032012.pds.tax" % options.dir_anno]
 			}
 			
 	args = {"iters" : "100"}
@@ -352,6 +355,7 @@ def	CDHITCluster(input):
 				"n": "8",
 				"g": "1",
 				"M": "10000",
+				"T": "15"
 				}
 		
 		CD_1 = CDHIT_EST(options.nodesize, args, [input])
@@ -365,7 +369,8 @@ def	CDHITCluster(input):
 		
 		args = {"mode": arg	
 				}
-		CD_2 = CDHIT_Mothurize(args, CD_1)			
+		CD_2 = CDHIT_Mothurize(args, CD_1)
+		CD_2a = CDHIT_Perls({}, CD_2)			
 		cdhits.append(CD_2)
 				
 	READY = FileMerger("list,rabund,sabund", cdhits)	
@@ -454,7 +459,7 @@ group.add_option("-S", "--SAMPLE", dest="sampletimes", default=0, type="int",
 group.add_option("-m", "--minlen", dest="minlength", default=220, type="int",
                  help="what is the minimum length of reads to process\n[%default]", metavar="#")                 
 group.add_option("-x", "--strict", dest="strictlevel", default=1, type="int",
-                 help="""how strict to be at deconvolution: 
+                 help="""how strict to be at demultiplexing: 
                  	1 very strict (barcode no mismatches, primer no mismatches) 
                  	2 less strict (barcode no mismatches, primer 1 mismatch allowed)
                  	[%default]""", metavar="#")                 
