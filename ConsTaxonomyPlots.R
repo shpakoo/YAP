@@ -389,6 +389,7 @@ ordering =function(x)
 
 getPvals = function(x, mapping)
 {
+
 	tmp = x
 	allheaders = unlist(mapping)
 	map = names(tmp)
@@ -414,7 +415,15 @@ getPvals = function(x, mapping)
 	
 	pval = NA
 	
-	if (length(tmp)>0)
+#	print ("...")
+#	print (mapping)
+#	print (tmp)
+#	print (as.numeric(map))
+#	print (sum(as.numeric(map)))
+#	print (sd(as.numeric(map)))
+	
+	
+	if (length(tmp)>0 && !is.na(sum(as.numeric(map))) && sd(as.numeric(map))>0  )
 	{
 
 		pval = kruskal.test(tmp, as.numeric(map) )$p.value 
@@ -448,6 +457,7 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 	
 	#print ("")
 	#print (tmp)
+	#print (orderclasses)
 	
 	######## normalize
 	if (perc)
@@ -479,10 +489,9 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 	
 	################
 	#print ("...")
-	#print (desc)
-	#print (column)	
+	#print (x)
 	pvals = apply(tmp[,names(tmp)%in% unlist(x[,2])], 1, getPvals, x[,2])
-	#print (names(pvals))
+	
 	
 	###############
 	
@@ -1221,6 +1230,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 				
 				curanno = annotation[annotation[,category]!= "NA" & annotation[,category]!= "" & ! is.na(annotation[,category]), ]
 				curdata = x[,names(x) %in% c("label", "depth", "taxonid", curanno$SampleID),]
+				
 				
 				if (ncol(curdata)>3)
 				{

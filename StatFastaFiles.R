@@ -35,7 +35,7 @@ makePlot = function(fastafile, fastas=list(),  main="Fasta", prefix="",...)
 		actualchars = fastas$actualchars
 	}
 		
-	stat= lengths
+	stat= log10(lengths)
 	desc = "sequence lengths"
 	xlim=c(min(stat),max(stat))
 	histopanel(stat, fastafile, desc, xlim, cols[random], 20)
@@ -45,7 +45,7 @@ makePlot = function(fastafile, fastas=list(),  main="Fasta", prefix="",...)
 	#~ xlim=c(min(stat),max(stat))
 	#~ histopanel(stat, fastafile, desc, xlim, cols[random], log10(20))
 	
-	stat = actualchars
+	stat = log10(actualchars)
 	desc = "lengths excluding excluding ,.-"
 	xlim=c(min(stat),max(stat))
 	histopanel(stat, fastafile, desc, xlim, cols[random], 20)

@@ -1566,8 +1566,12 @@ class	GroupRetriever(DefaultStep):
 class	CDHIT_454(DefaultStep):
 	def __init__(self, nodeCPUs, ARGS, PREV):
 		DefaultStep.__init__(self)
-		self.nodeCPUs=nodeCPUs
-		ARGS["T"] = self.nodeCPUs	
+		if ARGS.has_key("T"):
+			self.nodeCPUs = ARGS["T"]
+		else:
+			self.nodeCPUs=nodeCPUs
+			ARGS["T"]=self.nodeCPUs		
+
 		#self.setInputs(INS)
 		self.setArguments(ARGS)
 		self.setPrevious(PREV)
@@ -1589,9 +1593,9 @@ class	CDHIT_454(DefaultStep):
 			k ="%scd-hit-454 -i %s -o %s.cdhit %s" % (cdhitpath, f, f, args)
 			self.message(k)
 			if self.nodeCPUs>2:
-				task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+				task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
 			else:
-				task = GridTask(template="himem.q", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+				task = GridTask(template="himem.q", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
 			tasks.append(task)
 		
 		for task in tasks:
@@ -1639,8 +1643,13 @@ class	CDHIT_Mothurize(DefaultStep):
 class	CDHIT_EST(DefaultStep):
 	def __init__(self, nodeCPUs, ARGS, PREV):
 		DefaultStep.__init__(self)
-		self.nodeCPUs=nodeCPUs
-		ARGS["T"] = self.nodeCPUs	
+		
+		if ARGS.has_key("T"):
+			self.nodeCPUs = ARGS["T"]
+		else:
+			self.nodeCPUs=nodeCPUs
+			ARGS["T"]=self.nodeCPUs		
+		
 		#self.setInputs(INS)
 		self.setArguments(ARGS)
 		self.setPrevious(PREV)
@@ -1660,9 +1669,9 @@ class	CDHIT_EST(DefaultStep):
 		
 		self.message(k)
 		if self.nodeCPUs>2:
-			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
 		else:
-			task = GridTask(template="pick", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+			task = GridTask(template="himem.q", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
 		task.wait()	
 
 class	R_defaultplots(DefaultStep):
@@ -1683,7 +1692,7 @@ class	R_defaultplots(DefaultStep):
 		script.write("""source("%sConsTaxonomyPlots.R")\n""" % (scriptspath))
 		
 		for file in f:
-			dist = ".%s."% (self.getInputValue("dist"))
+			dist = ".%s"% (self.getInputValue("dist"))
 			
 			if file.find(dist)>-1 and file.find("seq")>-1 :
 				script.write("""makeDefaultBatchOfPlots("%s", "%s", fileprefix="SEQnum")\n""" % (anno, file))
@@ -2100,8 +2109,7 @@ class	mateInterweave(DefaultStep):
 			
 		for task in tasks:	
 			task.wait()
-			
-	
+				
 class	CLC_Assemble(DefaultStep):
 	def __init__(self, INS, ARGS, PREV):		
 		DefaultStep.__init__(self)
@@ -2148,6 +2156,73 @@ class	CLC_Assemble(DefaultStep):
 						time.sleep(60)
 					else:
 						done = True
+
+class	FastaSummaryRPlots(DefaultStep):
+	def __init__(self, ARGS, PREV):
+		DefaultStep.__init__(self)
+		#self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("FastaSummary")
+		#self.nodeCPUs=nodeCPUs
+	 	self.start()
+		
+	def	performStep(self):
+		self.find("fasta")
+		k = "R CMD BATCH %sStatFastaFiles.R" % (scriptspath)
+		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
+		task.wait()
+		
+class	ClearcutTree(DefaultStep):
+	def __init__(self, ARGS, PREV):
+		DefaultStep.__init__(self)
+		#self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("ClearcutTree")
+		#self.nodeCPUs=nodeCPUs
+	 	self.start()
+		
+	def	performStep(self):
+		x = self.find("fasta")
+		for fasta in x:
+			k = "%sclearcut --alignment --DNA --in=%s --out=%s.tre" % (binpath, fasta, fasta)
+			self.message(k)
+			task = GridTask(template="himem.q", name=self.stepname, command=k, cwd = self.stepdir)
+			task.wait()	
+			
+class	CDHIT_Perls(DefaultStep):
+	def __init__(self, ARGS, PREV):
+		DefaultStep.__init__(self)
+		#self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("CDHITperls")
+		#self.nodeCPUs=nodeCPUs
+	 	self.start()
+		
+	def	performStep(self):
+		x = self.find("cdhitclstr")
+		tasks=list()
+		for cluster in x:
+			k = "%sclstr2tree.pl %s > %s.tre" % (cdhitpath, cluster, cluster)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
+			tasks.append(task)
+			
+			k = "%sclstr_size_histogram.pl %s > %s.hist.tab.txt " % (cdhitpath, cluster, cluster)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
+			tasks.append(task)
+			
+			k = "%sclstr_size_stat.pl %s  > %s.size.tab.txt" % (cdhitpath, cluster, cluster)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
+			tasks.append(task)
+			
+			
+		for task in tasks:
+			task.wait()					
 	
 #################################################
 ##		Functions
@@ -2196,11 +2271,10 @@ def	getNext():
 ##		Begin
 ##
 
-mothurpath  = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/"
-cdhitpath 	= "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/"
+mothurpath  = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/mothur-current/"
+cdhitpath 	= "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/cdhit-current/"
 scriptspath = "/usr/local/devel/ANNOTATION/sszpakow/YAP/scripts/"
-
-
+binpath = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/"
 
 BOH = BufferedOutputHandler()
 MOTHUR = MothurCommandInfo(path=mothurpath)
