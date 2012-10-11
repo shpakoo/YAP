@@ -101,7 +101,7 @@ makeCurveSet=function(input, main, xlim=c(0,0), ylim=c(0,0), title="Distance to 
 		cols =  list()
 		
 		
-		# plot confidence intervals first (start from last columns - 
+		# plot confidence intervals first (start from last columns - furthers distance) 
 		for (idx in ((ncol(input)-1)/3):1)
 		{
 			K = 2+(idx-1)*3	
