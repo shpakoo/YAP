@@ -161,16 +161,44 @@ if options.master:
 	refhed = ""
 	seq= ""
 
-	print "Searching for %s..." % (options.pattern)
+	print "Searching for %s's and primers..." % (options.pattern)
 
+	references = list()
+	primers = list()
+	otpt = open("all.found.alignedprimercoords", "w")
 	for head, seq in file:
 		if head.startswith("%s" % (options.pattern)) and refhed == "":
 			refhed = head
 			refseq = seq
 			print "\t^--found !"
-			break
+		
+		if head.startswith("_primer_"):
+			print "\t^--found %s!" % (head)
+			seq = seq.lower()
+			primerseq = seq.lower().replace("-", "").replace(".", "")
+			letters =len(primerseq)
+			#### ....------ACTG-ACT-----......
+ 			####           S      E
+ 			
+			start = seq.find(primerseq[0])
+			counter = 0
+			
+			while letters > 0 and (start + counter) < len(seq) and seq[start+counter] != "." :
+				k = seq[start + counter]
+				
+				print k, start, counter
+				if k in ['a', 'c', 'g', 't']:	
+					letters = letters - 1	
+				counter +=1
+				
+			end = start + counter
+			
+			line = "%s\t%s\t%s\t%s\t%s\t%s\n" % (head, seq[start-2: end+2], start, end, len(primerseq), seq[start: end].count("-")) 
+			otpt.write(line)
+			print line.strip()
+	otpt.close()
 	
-	#### create temporary files with the reference found and submit qsub jobs
+	#### create temporary files with the references found and submit qsub jobs
 	file = FastaParser(options.infilename)
 	
 	counter=0

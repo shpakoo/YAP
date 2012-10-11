@@ -196,11 +196,11 @@ makeAlignmentHistogram=function(input, ref)
 	text(coords[2], median(ys), paste(coords[1], "-", coords[2],"\n" , info, sep=""), cex=0.75, pos=2)
 	
 	
+	# read counts
+	points(xs, ys, col="yellowgreen",lwd=2, type="h")
+	
 	# trendline
 	points(xs, lowess(ys, f=0.1)$y , type="l", lwd=6, col="gray50")
-
-	# read counts
-	points(xs, ys, col="yellowgreen",lwd=2, type="l")
 	
 	axis(1, at=xs[pattern], lab=xs[pattern], las=2, cex.axis=0.5, col="blue")
 	axis(3, at=xs[pattern], lab=labs[pattern], las=2, cex.axis=0.5, col="lightblue")
@@ -270,13 +270,16 @@ batch=function(inputfile, description, pattern="e_coli", cpus = 16)
 }
 
 
-makeAlignmentHistogram2=function(input, ref)
+makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0)
 {
 
 	labs = input$global
 	xs = input$local
 	### mothur decided to cut the first 19 bases off
-	xs= xs + 27
+	if (ref=="e_coli2_genbank")
+	{
+		xs= xs + 27
+	}
 
 	ys = input$val
 	
@@ -294,10 +297,13 @@ makeAlignmentHistogram2=function(input, ref)
 	plot(0, 0 , type="n",  axes=FALSE, xlab="position on REFERENCE consensus", xlim =xlim, ylim = ylim, ylab="count of aligned bases, (\"reads\" / species) at a position ")
 	abline()
 	
-	pattern= (1:10)%%10 == 1
+	#pattern= (1:10)%%10 == 1
+	pattern = seq(xlim[1], xlim[2], length.out=50 )
+	print (pattern)
+	
 	abline(v=xs[pattern], col="gray90")
 	
-	if (ref=="e_coli")
+	if (ref=="e_coli2_genbank")
 	{
 		### V8 
 		coords = c(1243, 1294)
@@ -369,33 +375,54 @@ makeAlignmentHistogram2=function(input, ref)
 		abline(v=coords[1], lty=3, col="red", lwd=1)
 	}	
 	
-	
-	# trendline
-	points(xs, lowess(ys, f=0.05)$y , type="l", lwd=7, col="gray40", lty=1)
-
 	# read counts
-	points(xs, ys, col="yellowgreen",lwd=2, type="l")
+	points(xs, ys, col="yellowgreen",lwd=1, type="h")
+		
+	# trendline
+	points(xs, lowess(ys, f=0.05)$y , type="l", lwd=5, col="gray40", lty=1)
+
 	
 	axis(1, at=xs[pattern], lab=xs[pattern], las=2, cex.axis=0.5, col="blue")
 	axis(3, at=xs[pattern], lab=labs[pattern], las=2, cex.axis=0.5, col="lightblue")
 	axis(2)
 
+	if (trimstart!=0)
+	{
+		print (xs[labs==trimstart])
+		abline(v=xs[labs==trimstart], col="gray80", lwd=2, lty=3)
+		
+	}
+	if (trimend !=0)
+	{
+		print (xs[labs==trimend])
+		abline(v= xs[labs==trimend], col="gray80", lwd=2, lty=3)
+	}
+	
 	box()
 	
-	legend ("right", 
-		c("read counts", "trendline", "primer locations", "\"V\" regions", "REFERENCE coordinates", "SILVA coordinates"),
-		fill=c("yellowgreen", "gray50", "red", "gray80", "blue", "lightblue"), 	
-		ncol=1, cex=0.75, bg="ivory")
+	if (ref=="16S")
+	{
+		legend ("right", 
+			c("read counts", "trendline", "primer locations", "\"V\" regions", "REFERENCE coordinates", "SILVA coordinates"),
+			fill=c("yellowgreen", "gray50", "red", "gray80", "blue", "lightblue"), 	
+			ncol=1, cex=0.75, bg="ivory")
+	}
+	else
+	{
+		legend ("right", 
+				c("read counts", "trendline", "REFERENCE coordinates", "ALIGNMENT coordinates"),
+				fill=c("yellowgreen", "gray50", "blue", "lightblue"), 	
+				ncol=1, cex=0.75, bg="ivory")
+	}
 	
 }
 
-
-batch2 = function(inputfile, ref="e_coli")
+batch2 = function(inputfile, ref="e_coli2_genbank", trimstart=0, trimend=0)
 {
 	input = read.table(inputfile, as.is=TRUE, header=FALSE)
 	names(input) <- c("global", "local", "val")
 	pdf(paste(inputfile,".pdf", sep=""), width=15, height=6)
-	makeAlignmentHistogram2(input, ref)
+	makeAlignmentHistogram2(input, ref, trimstart, trimend)
 	dev.off()
 }
 
