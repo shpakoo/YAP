@@ -1536,10 +1536,18 @@ class	AlignmentPlot(DefaultStep):
 		ref =  self.getInputValue("ref")
 		if ref == None:
 			ref="e_coli"
+			
+		trimstart = self.getInputValue("trimstart")
+		if trimstart==None:
+			trimstart=0
+			
+		trimend = self.getInputValue("trimend")
+		if trimend ==None:
+			trimend=0
 		
 		tmp = open("%s/alsum.r" % (self.stepdir), "w")
 		tmp.write("source(\"%s/alignmentSummary.R\")\n" % (scriptspath))	
-		tmp.write("batch2(\"%s\", ref=\"%s\" )\n" % (f, ref))
+		tmp.write("batch2(\"%s\", ref=\"%s\", trimstart=%s, trimend=%s )\n" % (f, ref, trimstart, trimend))
 		tmp.close()
 		k = "R CMD BATCH alsum.r"
 		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
@@ -2262,6 +2270,13 @@ def	getNext():
 	
 	return __counter__
 
+def	revComp(string):
+	global transtab
+	string=string.upper()
+	#reverse
+	string = string [::-1]
+	return string.translate(transtab)
+
 	
 #################################################
 ##		Arguments
@@ -2270,6 +2285,12 @@ def	getNext():
 #################################################
 ##		Begin
 ##
+
+from string import maketrans
+inttab=  "ACGTN"
+outtab = "TGCAN"
+transtab = maketrans(inttab, outtab)
+
 
 mothurpath  = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/mothur-current/"
 cdhitpath 	= "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/cdhit-current/"
