@@ -16,7 +16,7 @@ from Queue import Queue
 
 _author="Sebastian Szpakowski"
 _date="2012/10/01"
-_version="Version 2"
+_version="Version 3"
 
 #################################################
 ##        Classes
@@ -575,6 +575,8 @@ if options.mode=="ITS":
     _trimend = "2795"    
             
 init(options.project, options.email)
+
+print "We are in %s mode" % (options.mode) 
 
 ############################
 ######################
