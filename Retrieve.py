@@ -138,6 +138,10 @@ for line in loadLines(sys.argv[2]):
 #taxonomy, skip header			
 for line in loadLines(sys.argv[3])[1:]:
 	OTUid, size, classification = line.strip().split("\t")
+	
+	### OTU has become Otu0001 from just 1
+	while not OTUid[0].isdigit():
+		OTUid=OTUid[1:]
 	OTUid = int(OTUid)
 	
 	TAXONOMY[OTUid] = classification		
