@@ -268,7 +268,7 @@ def    finalize(input):
              "force": "fasta,name,group"}
     clean2 = MothurStep("screen.seqs", options.nodesize, dict(), args, [clean])
 
-    OutputStep("PRE454", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", clean)
+    OutputStep("2-PRE454", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", clean2)
 
     ###################### CDHIT
     #### unique and de-noise
@@ -282,6 +282,8 @@ def    finalize(input):
     #### de-noise/unique collapse            
     CD_1 = CDHIT_454(options.nodesize, args, [clean2])
     CD_2 = CDHIT_Mothurize(dict(), CD_1)
+    
+    OutputStep("3-UNIQUE", "tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_2)  
     
     #### add reference sequences to the merged experiments' file
     CD_3 = FileMerger("fasta,name,group,qfile", [CD_2, REF_1, REF_2, REF_3, PRI_1, PRI_2, PRI_3])
@@ -308,11 +310,11 @@ def    finalize(input):
     supplementary.append(CD_6)
     ###########################
     
-    OutputStep("ALIGNED", "tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4)    
+    OutputStep("4-ALIGNED", "tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4)    
        
     cleanCD = cleanup(CD_4)
 
-    OutputStep("CLEAN", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", cleanCD)
+    OutputStep("5-CLEAN", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", cleanCD)
     
     clusterCD = CDHITCluster(cleanCD)
     
@@ -601,7 +603,7 @@ PRI_1 = MakeNamesFile([PRI])
 PRI_2 = MakeGroupsFile([PRI], "ref")
 PRI_3 = MakeQualFile([PRI], "40")
 
-OutputStep("DEMUX", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [READY])
+OutputStep("1-DEMUX", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [READY])
 
 if options.sampletimes==0:
     tmp = finalize(READY)    
@@ -609,7 +611,7 @@ if options.sampletimes==0:
     z = R_OTUplots(dict(), dict(), tmp)
     supplementary.append(y)
     supplementary.append(z)
-    OutputStep("ENTIRE", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [tmp])
+    OutputStep("6-ENTIRE", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [tmp])
 
 else:
     thefinalset = list()
@@ -628,7 +630,7 @@ else:
         OutputStep("SAMPLED_%s" % (k), "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [tmp])
         thefinalset.append(tmp)
     
-OutputStep("SUPP_PLOTS", "tre,pdf,svg,tiff,r_nseqs,rarefaction,r_simpson,r_invsimpson,r_chao,r_shannon,r_shannoneven,r_coverage", supplementary)
+OutputStep("7-SUPP_PLOTS", "tre,pdf,svg,tiff,r_nseqs,rarefaction,r_simpson,r_invsimpson,r_chao,r_shannon,r_shannoneven,r_coverage", supplementary)
     
     
 ##########################################################################    
