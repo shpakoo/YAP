@@ -129,6 +129,7 @@ class	InfoParser:
 #################################################
 ##		Functions
 ##
+##
 	################################################
 	### Read in a file and return a list of lines
 	###
