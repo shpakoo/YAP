@@ -82,7 +82,7 @@ getColors=function(x)
 }
 
 
-makeCurveSet=function(input, main, xlim=c(0,0), ylim=c(0,0), title="Distance to form OTU")
+makeCurveSet=function(input, main, xlim=c(0,0), ylim=c(0,0), title="Distance to form OTU", ylab="# of OTUs")
 {
 
 		#input = input[order(input$numsampled),]
@@ -96,7 +96,7 @@ makeCurveSet=function(input, main, xlim=c(0,0), ylim=c(0,0), title="Distance to 
 			ylim = range(input[,seq(4, ncol(input), by=3)], na.rm=TRUE)
 		}
 
-		plot (0,0, type="n", main = main, ylab="# of OTUs", xlab="# sampled", xlim=xlim, ylim=ylim)
+		plot (0,0, type="n", main = main, ylab=ylab, xlab="# sampled", xlim=xlim, ylim=ylim)
 		dists = list()
 		cols =  list()
 		
@@ -105,11 +105,11 @@ makeCurveSet=function(input, main, xlim=c(0,0), ylim=c(0,0), title="Distance to 
 		for (idx in ((ncol(input)-1)/3):1)
 		{
 			K = 2+(idx-1)*3	
-			column = names(input)[K]
-			color= getColors(column)
+			#column = names(input)[K]
+			#color= getColors(column)
 			
-			dists = append(dists,column)
-			cols = append(cols, color) 
+			#dists = append(dists,column)
+			#cols = append(cols, color) 
 	
 			low = aggregate(input, by=list(input$numsampled), min)
 			high = aggregate(input, by=list(input$numsampled), max)
@@ -128,12 +128,12 @@ makeCurveSet=function(input, main, xlim=c(0,0), ylim=c(0,0), title="Distance to 
 			column = names(input)[K]
 			color= getColors(column)
 			
-#			dists = append(dists,column)
-#			cols = append(cols, color) 
-#			
+			dists = append(dists,column)
+			cols = append(cols, color) 
+			
 #			low = aggregate(input, by=list(input$numsampled), min)
 #			high = aggregate(input, by=list(input$numsampled), max)
-#			
+			
 			#segments (low$numsampled, low[,K+2], high$numsampled, high[,K+3], col="gray80")
 			
 			lines (input$numsampled, input[,column],  lwd=2, col=color)
@@ -153,15 +153,24 @@ for (stat in stats)
 {
 	files = dir(path=".", pattern=glob2rx(paste("*sorted.*",stat, sep="")) )
 	
+	if (stat == "rarefaction")
+	{
+		ylab = "# of OTUs"
+	}
+	else
+	{
+		ylab = unlist( strsplit(stat, "_")[[1]][2])
+	}
+	
 	if (length(files)>0)
 	{
 		input = data.frame()
 		for (f in files)
 		{
 				
-			curves = 1
 			input = read.table(f, sep="\t", header=T, as.is=T, fill=T, skip=0, check.names=F)
 
+			filelab = unlist( strsplit(f, "\\.")[[1]][1])
 			
 			### remove missing rows
 			input = input[! is.na(input[,1]),]
@@ -175,7 +184,7 @@ for (stat in stats)
 				cat("global: ", f,"\n", sep="")
 				pdf(paste(f, "curves.pdf", sep="."), paper="special", width=6, height=5)
 				par(mfrow=c(1,1))	
-				makeCurveSet(input, paste(stat, " (",f, ")\nall reads", sep="" ),title="Distance to form OTU" )
+				makeCurveSet(input, paste(stat, " (",filelab, ")\nall samples", sep="" ), title="Distance to form OTU", ylab = ylab)
 				dev.off()
 			}	
 			####### rarefactions local, make plots per sample
@@ -193,14 +202,16 @@ for (stat in stats)
 				print (xlim)
 				print (ylim)
 				
-				pdf(paste(f, "curves.pdf", sep="."), paper="special", width=6, height=5*length(samples))
-				par(mfrow=c(length(samples), 1))
+				#pdf(paste(f, "curves.pdf", sep="."), paper="special", width=6, height=5*length(samples))
+				#par(mfrow=c(length(samples), 1))
+				pdf(paste(f, "curves.pdf", sep="."), paper="special", width=6, height=5)
+				par(mfrow=c(1,1))
 				for (s in samples)
 				{	
 					tmp = input[,names(input)=="numsampled"| regexpr(s, names(input))>-1 ]
 					#print (names(tmp))
 					names(tmp)[2:length(names(tmp))] = unlist(lapply(names(tmp)[2:length(names(tmp))], function(x) { strsplit(x, "-")[[1]][1]} ))
-					makeCurveSet(tmp, paste(stat, " (", f, ")\n", s, "'s reads", sep="" ), title="Distance to form OTU" , xlim=xlim, ylim=ylim)
+					makeCurveSet(tmp, paste(stat, " (", filelab, ")\n", s, "'s reads", sep="" ), title="Distance to form OTU" , ylab = ylab,  xlim=xlim, ylim=ylim)
 				}
 				dev.off()
 			}
