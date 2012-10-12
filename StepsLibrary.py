@@ -317,21 +317,22 @@ class   TaskQueueStatus(Thread):
 		p = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE, close_fds=True )
 		p.wait()
 		out,err = p.communicate()
-			
-		queues = dict()
-		out = out.strip().split("\n")
-		for q in out[2:]:
-			queue, cqload, used, res, avail, total, acds, cdsu = q.split()
-			avail = float(avail)
-			total = float(total)
-			if total>0:
-				queues[queue] = avail
 		
-		#for k in ("default.q", "medium.q", "fast.q", "himem.q"):
-		for k in ("himem.q", "medium.q", "default.q"):
-		#for k in ("fast.q", "medium.q", "default.q"):
-			if queues[k] > queues[self.bestqueue]:
-				self.bestqueue= k
+		if err.find("neither submit nor admin host")==-1:
+			queues = dict()
+			out = out.strip().split("\n")
+			for q in out[2:]:
+				queue, cqload, used, res, avail, total, acds, cdsu = q.split()
+				avail = float(avail)
+				total = float(total)
+				if total>0:
+					queues[queue] = avail
+			
+			#for k in ("default.q", "medium.q", "fast.q", "himem.q"):
+			for k in ("himem.q", "medium.q", "default.q"):
+			#for k in ("fast.q", "medium.q", "default.q"):
+				if queues[k] > queues[self.bestqueue]:
+					self.bestqueue= k
 			  
 ### sanity check, this should match the counters				
 	def pollrunning(self):
