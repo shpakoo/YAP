@@ -1817,7 +1817,7 @@ class	AnnotateClusters(DefaultStep):
 				
 				for tax in t:
 					if tax.find(dist)>-1 and tax.find("otu")==-1:
-						k = "python %sRetrieve.py %s %s %s %s %s > cdhit_%s_annotated.fasta" % (scriptspath, dist, l[0], tax, g[0], fasta, dist)
+						k = "python %sRetrieve.py %s %s %s %s %s" % (scriptspath, dist, l[0], tax, g[0], fasta)
 						self.message(k)
 						task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  dependson=list(), cwd = self.stepdir)
 						tasks.append(task)
@@ -1863,7 +1863,7 @@ class	Bowtie1 (DefaultStep):
 			if "%s.mate2" % (name) in m2:
 				k = "bowtie %s -1 %s.mate1 -2 %s.mate2 > %s.bowtie1alignment" % (argstring, name, name, name)
 		 		#self.message(k)
-		 		task = GridTask(template="pick", name=self.stepname, command=k, cpu=cpus, dependson=list(), cwd = self.stepdir)	
+		 		task = GridTask(template="pick", name=self.stepname, command=k, cpu=cpus, dependson=list(), cwd = self.stepdir, debug=False)	
 				tasks.append(task)
 			else:
 				self.message("skipping: %s" % (name))
@@ -1871,8 +1871,8 @@ class	Bowtie1 (DefaultStep):
 		for f in m3:
 			name = ".".join(f.strip().split(".")[:-1])
 			k = "bowtie %s  %s > %s.bowtie1alignment" % (argstring, f, name)
-			self.message(k)
-			task = GridTask(template="pick", name=self.stepname, command=k, cpu=cpus, dependson=list(), cwd = self.stepdir)	
+			#self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cpu=cpus, dependson=list(), cwd = self.stepdir, debug=False)	
 			tasks.append(task)
 								
 		for task in tasks:
@@ -1987,19 +1987,18 @@ class	fastx_quality_stats(DefaultStep):
 		argstring = ""
 		for arg, val in self.arguments.items():
 			argstring = "%s %s %s " % (argstring, arg, val) 
-
-		tasks = list()
+			
 		self.message(m1)
 		for file in m1:
+				
 			k = "fastx_quality_stats %s -i %s -o %s.fastx_stats" % (argstring, file, file)
 			self.message(k)
 			task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=1,  cwd = self.stepdir)
 			tasks.append(task)
 			
 		for task in tasks:
-			task.wait()		
-
-
+			task.wait()	
+				
 class	fastq_quality_filter(DefaultStep):
 	def __init__(self, INS, ARGS, PREV):		
 		DefaultStep.__init__(self)
@@ -2033,15 +2032,6 @@ class	fastq_quality_filter(DefaultStep):
 		for task in tasks:
 			task.wait()	
 			
-#		k = "rm *.e*"
-#		self.message("cleanup...*e")
-#		task = GridTask(template="pick", name="rm", command=k, cpu=1,  cwd = self.stepdir)
-#		task.wait()
-#		
-#		k = "rm *.o*"
-#		self.message("cleanup...*o")
-#		task = GridTask(template="pick", name="rm", command=k, cpu=1,  cwd = self.stepdir)
-#		task.wait()	
 
 class	fastq2fasta(DefaultStep):
 	def __init__(self, INS, ARGS, PREV):		
@@ -2233,6 +2223,32 @@ class	CDHIT_Perls(DefaultStep):
 		for task in tasks:
 			task.wait()					
 	
+class	GuessFastQEncoding(DefaultStep):
+	def __init__(self, ARGS, PREV):
+		DefaultStep.__init__(self)
+		#self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("FastQEnc")
+		#self.nodeCPUs=nodeCPUs
+	 	self.start()
+		
+	def	performStep(self):
+	
+		x = self.find("mate1")
+		k = "python %sFastQEncoding.py %s > %s.offset" % (scriptspath, x[0], x[0])
+		self.message(k)
+		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
+		task.wait()
+		
+		otpt = ""
+		for line in loadLines("%s/%s.offset" % (self.stepdir, x[0])):
+			otpt = "%s%s" % (otpt, line.strip())
+		
+		self.message("%s -> %s" % (x[0], otpt)) 
+		self.setOutputValue("-Q", otpt)
+		
+	
 #################################################
 ##		Functions
 ##
@@ -2278,6 +2294,12 @@ def	revComp(string):
 	string = string [::-1]
 	return string.translate(transtab)
 
+def getQ(file):
+	k = "python %sFastQEncoding.py %s" % (scriptspath, file)
+	p = Popen(shlex.split(k), stdout=PIPE, stderr=PIPE, close_fds=True)
+	out,err = p.communicate()
+	p.wait()
+	return "%s" % (out.strip())
 	
 #################################################
 ##		Arguments

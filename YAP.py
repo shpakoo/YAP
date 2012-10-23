@@ -270,13 +270,24 @@ def    finalize(input):
 
     OutputStep("2-PRE454", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", clean2)
 
-    ###################### CDHIT
+    ###################### CDHIT-454
     #### unique and de-noise
-    args=         {     "c" : "1.0",
-                    "b" : "8",
-                    "aS": "1.0",
+#    args=         { 
+#                    "c" : "1.0",
+#                    "b" : "8",
+#                    "aS": "1.0",
+#                    "g" : "1",
+#                    "M"    : "50000",
+#                    "T" : "%s" % (options.nodesize)
+#                }
+    
+    ### aggressive denoising:
+    args=         { 
+                    "c" : "0.98",
+                    "b" : "10",
+                    "aS": "0.0",
                     "g" : "1",
-                    "M"    : "50000",
+                    "M"    : "0",
                     "T" : "%s" % (options.nodesize)
                 }
     #### de-noise/unique collapse            
@@ -611,7 +622,7 @@ if options.sampletimes==0:
     z = R_OTUplots(dict(), dict(), tmp)
     supplementary.append(y)
     supplementary.append(z)
-    OutputStep("6-ENTIRE", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [tmp])
+    OutputStep("6-ENTIRE", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary,phylotax", [tmp])
 
 else:
     thefinalset = list()
