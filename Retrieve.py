@@ -154,6 +154,15 @@ for line in loadLines(sys.argv[4]):
 	GROUPS[id]=group
 
 # fasta
+
+otpt = open("otureps_%s_annotated.fasta" % (sys.argv[1]), "w")
+otpt2= open("otureps_%s_clean.fasta" % (sys.argv[1]), "w")
+otpt3= open("otureps_%s.phylotax" % (sys.argv[1]), "w")
+levels= ["Kingdom","Phylum","Class","Order","Family","Genus","Species","Strain"]
+
+otpt3.write("otuid\t%s\n" % ("\t".join(levels) ) )
+
+
 for head, seq in FastaParser(sys.argv[5]):
 	tmp = set()
 	### OTUs	
@@ -161,9 +170,35 @@ for head, seq in FastaParser(sys.argv[5]):
 		tmp.add(GROUPS[K])
 	tmp = list(tmp)
 	tmp.sort()
-	otpt = ">%s|%s|%s|%s|%s\n%s" % ( head, TAXONOMY[SEQid[head]],  ";".join(tmp), len(OTUs[SEQid[head]]), len(tmp), seq)
+	line = ">%s|%s|%s|%s|%s\n%s\n" % ( head, TAXONOMY[SEQid[head]],  ";".join(tmp), len(OTUs[SEQid[head]]), len(tmp), seq)
+	otpt.write(line)
 	
-	print otpt
+	line = ">%s\n%s\n" % ( head, seq)
+	otpt2.write(line)
+	
+	tax = TAXONOMY[ SEQid[head] ]
+	tax = tax.split(";")
+	
+	line = "%s" % ( head )
+	for n,v in zip(levels, tax):
+		v = v.strip().split("(")[0].strip("\"")
+		if v.lower() in ["", "unclassified" ]:
+			v="NA"
+		line = "%s\t%s" % (line, v)
+	x = len(levels)-len(tax)
+	
+	while x>0:
+		line = "%s\t%s" % (line, v)
+		x-=1
+	print line.strip()
+		
+	otpt3.write(line)
+	otpt3.write("\n")
+	
+otpt.close()
+otpt2.close()
+otpt3.close()
+
 
 #################################################
 ##		Finish
