@@ -183,10 +183,11 @@ for clusterid, contents in FastaLikeParser(options.fn_clstr):
 	representative= ""
 	descendants = set()
 	for line in contents.strip().split("\n"):
+		line = line.strip()
 		id = line.split(">")[1].split("...")[0].split()[0]
 		if line.endswith("*"):
 			representative = id
-		
+			#print "repr"
 		### self is always a descendant of itself!
 		descendants.add(id)
 		[descendants.add(x) for x in  names[id]]	
@@ -222,12 +223,17 @@ else:
 	
 	mx = 0
 	for key, vals in outputnames.items():
-		
-
 		otus[len(vals)].append(vals)
-		listfile.write("\t%s" % (",").join(list(vals)))
-		rafile.write("\t%s" % (len(vals)))
-		mx = max (mx, len(vals))
+		
+		### the OTUs must start with a representative, followed by rest
+		#print key, vals
+		vals.remove(key)
+		curotu = "%s,%s" % (key, (",").join(list(vals)))
+		listfile.write("\t%s" % curotu.strip(","))
+		
+		### we removed the representative, add one!)
+		rafile.write("\t%s" % (len(vals)+1))
+		mx = max (mx, len(vals)+1)
 	
 	safile.write("\t%s" % (mx) )
 	for x in range (max(otus.keys())):
