@@ -8,7 +8,12 @@
 
 #!/usr/bin/python
 #################################################
-## 	A new program
+## 	Retrieves necessary information from
+##	taxonomy, list, groups and fasta
+## 	to produce fasta where seqids (i.e. OTU reps)
+##	are enriched in taxonomy, and count of samples/sequences in , 
+##	clean fasta
+## 	and taxonomy per read (for input into e.g. phyloseq)
 #################################################
 import sys
 from optparse import OptionParser
@@ -21,7 +26,7 @@ _version="Version 1"
 ##		Classes
 ##
 	#################################################
-	### Iterator over input fata file.
+	### Iterator over input fasta file.
 	### Only reading when requested
 	### Useful for very large FASTA files
 	### with many sequences
@@ -182,8 +187,8 @@ for head, seq in FastaParser(sys.argv[5]):
 	line = "%s" % ( head )
 	for n,v in zip(levels, tax):
 		v = v.strip().split("(")[0].strip("\"")
-		if v.lower() in ["", "unclassified" ]:
-			v="NA"
+		#if v.lower() in ["", "unclassified" ]:
+		#	v="NA"
 		line = "%s\t%s" % (line, v)
 	x = len(levels)-len(tax)
 	
