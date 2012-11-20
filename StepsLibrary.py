@@ -8,7 +8,7 @@
 ## A library of "steps" or program wrappers to construct pipelines
 ## Pipeline steps orchestration, grid management and output handling.
 #################################################
-import sys, tempfile, shlex, glob, os, hashlib, time, datetime, re, curses
+import sys, tempfile, shlex, glob, os, stat, hashlib, time, datetime, re, curses
 from threading import *
 from subprocess import *
 from MothurCommandInfoWrapper import *
@@ -240,7 +240,7 @@ class   TaskQueueStatus(Thread):
 		self.previous =""
 		
 		self.start()
-	
+			
 	def run(self):
 		BOH.outputUpdate("Setting up the grid...")
 		print "Setting up grid..."
@@ -350,16 +350,22 @@ class   TaskQueueStatus(Thread):
 				tmp = self.scheduled.get()
 				self.processing[tmp.getUniqueID()]=tmp
 				#print "submitting", tmp.getUniqueID()
+				
+				
 				jid = tmp.submit()
 				#print jid
 				
 				if jid==-1:
 					print "???", tmp
 				
+		
+				
 				self.registered[tmp.getUniqueID()] = [tmp.getGridId(), "running"]	
 				self.available-=1
 			else:
 				break
+			
+			
 		
 	def pickQ(self):
 		return self.bestqueue
@@ -426,15 +432,37 @@ class GridTask():
 		### keep po pe o e streams for debugging purposes
 		if self.debugflag:
 			self.retainstreams=""
-			
 		
+			
+		### to avoid long command problems, create a script with the command, and invoke that instead of the command directyly.	
+		px = "tmp.%s.%s.%s.%s." % (randrange(1,100),randrange(1,100),randrange(1,100),randrange(1,100))
+		sx = ".%s.%s.%s.%s.sh" % (randrange(1,100),randrange(1,100),randrange(1,100),randrange(1,100))
+		
+
+		##### to avoid too many opened files OSError
+		pool_open_files.acquire()
+		### bounded semaphore should limit throttle the files opnening for tasks created around the same time	
+		scriptfile, scriptfilepath = tempfile.mkstemp(suffix=sx, prefix=px, dir=self.cwd, text=True)
+		os.close(scriptfile)
+		self.scriptfilepath = scriptfilepath	
+		
+		os.chmod(self.scriptfilepath,  0777 )
+		input= "%s\n" % (self.inputcommand) 
+		scriptfile = open(self.scriptfilepath, "w")
+		scriptfile.write(input)
+		scriptfile.close()
+		pool_open_files.release()
+		####
+		
+		
+			
 		self.templates=dict()
-		self.templates["himem.q"]	  = 'qsub %s -P %s -N jh.%s -cwd -pe threaded %s -l "himem" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name, cpu, self.email, holdfor, self.inputcommand)	
-		self.templates["default.q"]	 = 'qsub %s -P %s -N jd.%s -cwd -pe threaded %s -M %s -m a %s "%s" ' % (self.retainstreams, self.project, name, cpu,  self.email, holdfor,  self.inputcommand)
-		self.templates["fast.q"]	   = 'qsub %s -P %s -N jf.%s -cwd -pe threaded %s -l "fast" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name,cpu,  self.email, holdfor, self.inputcommand)	
-		self.templates["medium.q"]	 = 'qsub %s -P %s -N jm.%s -cwd -pe threaded %s -l "medium" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name, cpu,  self.email, holdfor, self.inputcommand)
-		self.templates["himemCHEAT"] = 'qsub %s -P %s -N jH.%s -cwd -pe threaded %s -l "himem" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name, 1, self.email, holdfor, self.inputcommand)	
-		self.templates["mpi"]		 = 'qsub %s -P %s -N jP.%s -cwd -pe orte %s -M %s -m a  %s mpirun -np %s "%s" ' % (self.retainstreams, self.project, name, cpu, cpu, self.email, holdfor, self.inputcommand )
+		self.templates["himem.q"]	  = 'qsub %s -P %s -N jh.%s -cwd -pe threaded %s -l "himem" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name, cpu, self.email, holdfor, self.scriptfilepath)	
+		self.templates["default.q"]	 = 'qsub %s -P %s -N jd.%s -cwd -pe threaded %s -M %s -m a %s "%s" ' % (self.retainstreams, self.project, name, cpu,  self.email, holdfor,  self.scriptfilepath)
+		self.templates["fast.q"]	   = 'qsub %s -P %s -N jf.%s -cwd -pe threaded %s -l "fast" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name,cpu,  self.email, holdfor, self.scriptfilepath)	
+		self.templates["medium.q"]	 = 'qsub %s -P %s -N jm.%s -cwd -pe threaded %s -l "medium" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name, cpu,  self.email, holdfor, self.scriptfilepath)
+		self.templates["himemCHEAT"] = 'qsub %s -P %s -N jH.%s -cwd -pe threaded %s -l "himem" -M %s -m a  %s "%s" ' % (self.retainstreams, self.project, name, 1, self.email, holdfor, self.scriptfilepath)	
+		self.templates["mpi"]		 = 'qsub %s -P %s -N jP.%s -cwd -pe orte %s -M %s -m a  %s mpirun -np %s "%s" ' % (self.retainstreams, self.project, name, cpu, cpu, self.email, holdfor, self.scriptfilepath )
 		self.command = ""
 		QS.register(self);
 						
@@ -442,16 +470,19 @@ class GridTask():
 
 		if not self.queue in self.templates.keys():
 			self.queue = QS.pickQ()
-			
 		self.command = self.templates[self.queue]
-		#print self.command
+		
 		p = Popen(shlex.split(self.command), stdout=PIPE, stderr=PIPE, cwd=self.cwd, close_fds=True)
 		
 		p.wait()
 		out, err = p.communicate()
+		
+		
 			
 		err = err.strip()
 		out = out.strip()
+		
+
 		
 		if err!="":
 			print err
@@ -473,6 +504,11 @@ class GridTask():
 
 	def setCompleted(self):
 		self.completed=True
+		try:
+			if not self.debugflag:
+				os.remove(self.scriptfilepath)
+		except OSError, error:
+			print( "%s already gone" % self.scriptfilepath)
 		QS.flagRemoval(self)
 
 	def isCompleted(self):
@@ -565,6 +601,7 @@ class	DefaultStep(Thread):
 		
 		#### flag for completion
 		self.completed = False
+		self.completedpreviously=False
 		self.failed = False
 		
 		#### keep track of time elapsed
@@ -617,12 +654,14 @@ class	DefaultStep(Thread):
 			self.message("Completed (previously).")	
 			BOH.deregister()
 			self.completed=True
+			self.completedpreviously=True
 		
 	def	performStep():
 		self.message("in a step...")
 				
 	def	init(self):
 	
+		redo=False
 		### wait for previous steps to finish
 		for k in self.previous:
 			while not k.isDone():
@@ -630,7 +669,9 @@ class	DefaultStep(Thread):
 				time.sleep(1)
 			if k.hasFailed():
 				self.failed=True
+			redo=redo or (not k.isDonePreviously())	
 		
+		#self.message("needs a redo %s" % (redo))
 		if not self.failed:
 			### time stamp
 			self.starttime = time.time()
@@ -647,7 +688,7 @@ class	DefaultStep(Thread):
 			
 			#### create directories if necessary
 			self.stepdir =""
-			self.prepareDir()	
+			self.prepareDir(redo=redo)	
 			
 	def	makeWorkPathId(self):
 		tmp = list()
@@ -673,56 +714,50 @@ class	DefaultStep(Thread):
 	def	getWorkPathId(self):	
 		return (self.workpathid)
 				
-	def	prepareDir(self):
+	def	prepareDir(self, redo=False):
 		### make step's directory
 		self.stepdir = "Step_%s_%s" % (self.stepname, self.workpathid)
 		
+		
+		flush_old = False
 		try:	
 			os.mkdir(self.stepdir)				
 		except OSError, error:
 			self.message( "Step directory already exists...")
+			flush_old=True
 		
-		### has analysis been done already?
-		try:
-			self.parseManifest()
-			self.completed=True		
-			self.message("Using data generated previously...")
-
-		except	IOError, inst:
-			#self.message("Will make new manifest...")
-			pass
-		except Exception, inst:	
-			self.message("****ERROR***")	
-			self.message(type(inst))
-			self.message(inst.args)
-			self.message(inst)
-			self.message("************")					
+		
+		if redo:
+			if flush_old:
+				self.message("Updating...")
+				k = "rm -r *"
+				task = GridTask(template="pick", name="redo_clean", command=k, cpu=1,  cwd = self.stepdir)
+				task.wait()
+			else:
+				###supposedly no old step-data to flush
+				pass	
+			
+		else:	
+			### has analysis been done already?
+			try:
+				self.parseManifest()
+				self.completed=True		
+				self.completedpreviously=True
+				self.message("Using data generated previously...")
 	
-	def gridCleanUp(self):
-		
-		self.message("cleanup...*.e *.o *.pe *.po")
-		
-		k = "rm *.e*"
-		task = GridTask(template="pick", name="rm", command=k, cpu=1,  cwd = self.stepdir)
-		task.wait()
-		
-		k = "rm *.o*"
-		task = GridTask(template="pick", name="rm", command=k, cpu=1,  cwd = self.stepdir)
-		task.wait()	
-		
-		k = "rm *.pe*"
-		task = GridTask(template="pick", name="rm", command=k, cpu=1,  cwd = self.stepdir)
-		task.wait()
-		
-		k = "rm *.po*"
-		task = GridTask(template="pick", name="rm", command=k, cpu=1,  cwd = self.stepdir)
-		task.wait()	
-																
+			except	IOError, inst:
+				#self.message("Will make new manifest...")
+				pass
+			except Exception, inst:	
+				self.message("****ERROR***")	
+				self.message(type(inst))
+				self.message(inst.args)
+				self.message(inst)
+				self.message("************")					
+																	
 	def	finalize(self):
 		
-		if not self.failed:
-			#self.gridCleanUp()
-			
+		if not self.failed:			
 			self.categorizeAndTagOutputs()
 			self.makeManifest()
 			
@@ -775,14 +810,8 @@ class	DefaultStep(Thread):
 		elif extension == "cdhit":
 			return "fasta"
 		
-		elif extension == "align":
+		elif extension in ["align", "fna", "fa", "seq", "aln"]:
 			return "fasta"
-		elif extension == "fna":
-			return "fasta"
-		elif extension == "fa":
-			return "fasta"
-		elif extension == "seq":
-			return "fasta"	
 			
 		elif extension == "qual":
 			return "qfile"
@@ -796,6 +825,9 @@ class	DefaultStep(Thread):
 			return "group"
 		elif extension == "files":
 			return "file"
+		
+		elif extension in ["tre", "tree", "dnd"]:
+			return "tre"
 		
 		### sge job files
 		elif re.search("po\d{3}", extension) != None:
@@ -842,10 +874,14 @@ class	DefaultStep(Thread):
 
 				self.outputs[self.determineType(newfilename)].add(newfilename)
 						
-	def	find(self, arg, ln=True):
-		files=list()			
-		if len(self.inputs[arg])==0:
-			tmp = {arg: self.getOutputs(arg)}
+	def	find(self, arg, ln=True, original=False):
+		files=list()	
+		if not original:		
+			if len(self.inputs[arg])==0:
+				tmp = {arg: self.getOutputs(arg)}
+				self.setInputs(tmp)	
+		else:
+			tmp = {arg: self.getOriginal(arg)}		
 			self.setInputs(tmp)	
 
 		files = self.inputs[arg]
@@ -868,7 +904,7 @@ class	DefaultStep(Thread):
 		#unique	
 		toreturn = set(toreturn)
 		return list(toreturn)
-		
+				
 	def	isVar(self,x):
 		return x.startswith("[var]")
 	
@@ -889,6 +925,19 @@ class	DefaultStep(Thread):
 			return otpt			
 		else:
 			return list()
+		
+	def	getOriginal(self, arg):
+		if self.previous == None:
+			return self.getOutputs(arg)
+		else:	
+			current = self.getOutputs(arg)
+			otpt = list()			
+			for k in self.previous:
+				otpt.extend(k.getOriginal(arg))
+			if len(otpt)>0:
+				return otpt
+			else:
+				return current		
 			
 	def	parseManifest(self):
 		fp = open("%s/%s.manifest" % (self.stepdir, self.workpathid), "r")
@@ -920,7 +969,10 @@ class	DefaultStep(Thread):
 				BOH.toPrint(self.workpathid, self.stepname, text)		
 				
 	def	isDone(self):
-		return self.completed
+		return self.completed 
+	
+	def	isDonePreviously(self):
+		return self.completedpreviously 
 
 	def	hasFailed(self):
 		return self.failed
@@ -1115,7 +1167,7 @@ class	MothurStep(DefaultStep):
 	
 	def	performStep(self):
 		call, parallel, himem = self.makeCall()	
-		k = "%smothur \\\"#%s\\\"" % (mothurpath, call)
+		k = "%smothur \"#%s\"" % (mothurpath, call)
 		self.message(k)
 		if (parallel and self.nodeCPUs>1):
 			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)
@@ -1727,6 +1779,8 @@ class	R_OTUplots(DefaultStep):
 		self.setName("R_plots_otu")
 		self.start()
 	def	performStep(self):
+	
+		####OTUS
 		f = self.find("fasta")
 		tasks = list()
 
@@ -1735,13 +1789,23 @@ class	R_OTUplots(DefaultStep):
 		
 		for file in f:
 			if file.find("annotated.fasta")>0:
-				k = """grep \\\">\\\" %s | awk '{FS = \\\"|\\\"; OFS=\\\"\\\\t\\\"} {print $4, $5}' > %s.tab.txt""" % (file, file)
-				task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
+				k = """grep ">" %s | awk '{FS = "|"; OFS="\t"} {print $4, $5}' > %s.tab.txt""" % (file, file)
+				task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir, debug=False)
 				tasks.append(task)
 				script.write("""makeBatch("%s.tab.txt")\n""" % (file))
-	
+				
+		####COVERAGE
+		f = self.find("clcassemblystats")
+		tasks = list()
+
+		script = open("%s/script.r" % (self.stepdir), "w")
+		script.write("""source("%sOtuReadPlots.r")\n""" % (scriptspath))
+		
+		for file in f:
+				script.write("""makeBatchCoverage("%s")\n""" % (file))		
 		script.close()
 		
+		### make sure all conversions are complete
 		for task in tasks:
 			task.wait()
 		
@@ -1786,6 +1850,81 @@ class	AlignmentTrim(DefaultStep):
 		self.message(k)
 		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  dependson=list(), cwd = self.stepdir)
 		task.wait()	
+
+class	TCOFFEE(DefaultStep):
+	def __init__(self, INS, ARGS, PREV):
+		DefaultStep.__init__(self)
+		self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("TCOFFEE")
+		self.start()
+						
+	def	performStep(self):
+		pattern=[]
+		files = self.find("fasta")
+		tasks = list()
+		argstring = ""
+		for arg, val in self.arguments.items():
+			if arg == "pattern":
+				pattern = val.strip().split(",")
+			else:	
+				argstring = "%s %s %s " % (argstring, arg, val)
+			
+		template = "t_coffee " 
+			
+		for f in files:
+			if len(pattern)>0:
+				for k in pattern:
+					if f.find(k)>-1:
+						command = "%s %s %s " % (template, f, argstring)
+						self.message(command)
+						task = GridTask(template="pick", name=self.stepname, command=command, cpu=4,  dependson=list(), cwd = self.stepdir, debug=False)
+						task.wait()
+			else:
+				command = "%s %s %s " % (template, f, argstring)
+				self.message(command)
+				task = GridTask(template="pick", name=self.stepname, command=command, cpu=4,  dependson=list(), cwd = self.stepdir, debug=False)
+				task.wait()	
+
+class	CLUSTALW2(DefaultStep):
+	def __init__(self, INS, ARGS, PREV):
+		DefaultStep.__init__(self)
+		self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("CLUSTALW2")
+		self.start()
+						
+	def	performStep(self):
+		pattern = []
+		files = self.find("fasta")
+		tasks = list()
+		argstring = ""
+		for arg, val in self.arguments.items():
+			if arg == "pattern":
+				pattern = val.strip().split(",")
+			else:	
+				argstring = "%s %s %s " % (argstring, arg, val)
+			
+		template = "%sclustalw2 %s " % (binpath, argstring)
+			
+		for f in files:
+			if len(pattern)>0:
+				for k in pattern:
+					if f.find(k)>-1:
+						command = "%s -INFILE=%s" % (template, f)
+						self.message(command)
+						task = GridTask(template="pick", name=self.stepname, command=command, cpu=1,  dependson=list(), cwd = self.stepdir, debug=False)
+						tasks.append(task)
+			else:
+				command = "%s -INFILE=%s" % (template, f)
+				self.message(command)
+				task = GridTask(template="pick", name=self.stepname, command=command, cpu=1,  dependson=list(), cwd = self.stepdir, debug=False)
+				tasks.append(task)
+				
+		for task in tasks:
+			task.wait()						
 					
 class	AnnotateClusters(DefaultStep):
 	def __init__(self, INS, ARGS, PREV):
@@ -1807,7 +1946,7 @@ class	AnnotateClusters(DefaultStep):
 		self.message(f)
 		self.message(g)
 			
-		if len(l)==0 or len(t)==0 or len(f)==0 or len(g) ==0:
+		if len(l)==0 or len(t)==0 or len(f)==0 or len(g) == 0:
 			self.failed=True
 		else:
 		
@@ -2155,7 +2294,99 @@ class	CLC_Assemble(DefaultStep):
 						time.sleep(60)
 					else:
 						done = True
+								
 
+class	CLC_Assemble_Ref(DefaultStep):
+	def __init__(self, INS, ARGS, PREV):		
+		DefaultStep.__init__(self)
+		self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("CLC_Assemble_Ref")
+	 	self.start()
+		
+	def	performStep(self):
+		tasks = list()
+		x= self.find("properties")
+		cpus=1
+		template="pick"
+		
+		if len(x)!=1:
+			self.failed=True
+		else:
+			fastas = self.find("fasta")
+			contigs = list()
+			reads = list()
+			if len(fastas)<=2:
+				for f in fastas:
+					if f.find("contig")>-1:
+						contigs.append(f)
+					else:
+						reads.append(f)
+				
+						
+				contigs = contigs[0]
+				reads = reads[0]		
+				m1 = self.find("mate1", original=True)[0]	
+				m2 = self.find("mate2", original=True)[0]			
+							
+				prefix = ".".join(contigs.split(".")[:-1])
+				argstring=""
+				for arg, val in self.arguments.items():
+					argstring = "%s %s %s " % (argstring, arg, val) 
+					if arg=="--cpus":
+						cpus=val
+						
+				### clean reads		
+				done = False
+				while not done:
+					k = "/usr/local/packages/clc-ngs-cell/clc_ref_assemble_long  %s -o %s.clean.cas -q %s -d %s" % (argstring, prefix, reads, contigs)
+					self.message(k)
+					
+					task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=cpus,  cwd = self.stepdir, debug=True)
+					task.wait()
+					
+					for file in glob.glob("%s/*.e*" % (self.stepdir)):
+						#self.message(file)
+						contents = "\n".join(loadLines("%s" % (file)))
+						if contents.find("No more available licenses")>-1:	
+							self.message("No more available licenses, retrying in a bit...")
+							command = "rm %s" % (file)
+							p = Popen(shlex.split(command), close_fds=True)
+							p.wait()
+							time.sleep(60)
+						else:
+							done = True
+				
+				### original / all reads		
+#				done = False
+#				while not done:			
+#					k = "/usr/local/packages/clc-ngs-cell/clc_ref_assemble_long  %s -o %s.original.cas -q -i %s %s -d %s" % (argstring, prefix, m1, m2, contigs)
+						
+
+			else:
+				self.failed=True
+
+
+class	CLC_Assemble_Info(DefaultStep):
+	def __init__(self, ARGS, PREV):
+		DefaultStep.__init__(self)
+		#self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("CLC_Assemble_Info")
+		#self.nodeCPUs=nodeCPUs
+	 	self.start()
+		
+	def	performStep(self):
+	
+		for f in self.find("cas"):
+			k = "/usr/local/packages/clc-ngs-cell/assembly_info %s > %s.clcassemblystats" % (f,f)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
+			task.wait()
+			
+				
 class	FastaSummaryRPlots(DefaultStep):
 	def __init__(self, ARGS, PREV):
 		DefaultStep.__init__(self)
@@ -2169,6 +2400,7 @@ class	FastaSummaryRPlots(DefaultStep):
 	def	performStep(self):
 		self.find("fasta")
 		k = "R CMD BATCH %sStatFastaFiles.R" % (scriptspath)
+		self.message(k)
 		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
 		task.wait()
 		
@@ -2314,11 +2546,14 @@ inttab=  "ACGTN"
 outtab = "TGCAN"
 transtab = maketrans(inttab, outtab)
 
+pool_open_files = BoundedSemaphore(value=10, verbose=False)
 
 mothurpath  = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/mothur-current/"
 cdhitpath 	= "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/cdhit-current/"
 scriptspath = "/usr/local/devel/ANNOTATION/sszpakow/YAP/scripts/"
 binpath = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/"
+
+__counter__ = 0
 
 BOH = BufferedOutputHandler()
 MOTHUR = MothurCommandInfo(path=mothurpath)
@@ -2326,10 +2561,8 @@ QS = TaskQueueStatus(update = 0.1, maxnodes=250)
 
 defaulttemplate = "himem.q"
 
-__counter__ = 0
 
-pool_files = BoundedSemaphore  (value = 200  ) 
-pool_threads = BoundedSemaphore(value = 25   )
+
 
 #################################################
 ##		Finish
