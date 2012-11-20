@@ -494,11 +494,11 @@ def    plotsAndStats(input):
     
     args = {"force" : "list", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.01"}
     s29 = MothurStep("rarefaction.single", options.nodesize, dict(), args, [s24])
-    #return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29])
+    return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29])
     
-    args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.01"}
-    s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24]) 
-    return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29, s30])
+    #args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.1"}
+    #s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24]) 
+    #return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29, s30])
     
     
 #################################################
