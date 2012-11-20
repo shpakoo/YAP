@@ -1785,32 +1785,29 @@ class	R_OTUplots(DefaultStep):
 		f = self.find("fasta")
 		tasks = list()
 
-		script = open("%s/script.r" % (self.stepdir), "w")
-		script.write("""source("%sOtuReadPlots.r")\n""" % (scriptspath))
+		#script = open("%s/script.r" % (self.stepdir), "w")
+		#script.write("""source("%sOtuReadPlots.r")\n""" % (scriptspath))
 		
 		for file in f:
 			if file.find("annotated.fasta")>0:
-				k = """grep ">" %s | awk '{FS = "|"; OFS="\t"} {print $4, $5}' > %s.tab.txt""" % (file, file)
+				k = """grep ">" %s | awk '{FS = "|"; OFS="\t"} {print $4, $5}' > %s.otustats""" % (file, file)
 				task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir, debug=False)
 				tasks.append(task)
-				script.write("""makeBatch("%s.tab.txt")\n""" % (file))
+				#script.write("""makeBatch("%s.otustats")\n""" % (file))
 				
 		####COVERAGE
 		f = self.find("clcassemblystats")
-		tasks = list()
-
-		script = open("%s/script.r" % (self.stepdir), "w")
-		script.write("""source("%sOtuReadPlots.r")\n""" % (scriptspath))
 		
-		for file in f:
-				script.write("""makeBatchCoverage("%s")\n""" % (file))		
-		script.close()
+		#for file in f:
+				#script.write("""makeBatchCoverage("%s")\n""" % (file))		
+		
+		#script.close()
 		
 		### make sure all conversions are complete
 		for task in tasks:
 			task.wait()
 		
-		k =	"R CMD BATCH script.r"	
+		k =	"R CMD BATCH %sOtuReadPlots.r" % (scriptspath)
 		self.message(k)
 		
 		task = GridTask(template="pick", name=self.stepname, command=k, dependson=list(), cwd = self.stepdir)
