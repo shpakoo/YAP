@@ -121,7 +121,7 @@ makeGGplot=function(fastafiles, fastas=list(), main=fastafile, prefix="",...)
 			b = strsplit( a,"-")[[1]]
 			if (length(b)>2)
 			{
-				f=b[1]
+				b=b[1]
 			}
 			else
 			{
@@ -133,9 +133,10 @@ makeGGplot=function(fastafiles, fastas=list(), main=fastafile, prefix="",...)
 			b=f
 		}
 		cat(f, "->", a, "->", b, "\n")
-	
-		
 		alldata$file=rep(b, nrow(alldata))
+		
+		
+		
 		if (nrow(global)==0)
 		{
 			global=alldata
