@@ -1608,22 +1608,55 @@ class	AlignmentPlot(DefaultStep):
 		task.wait()
 		
 class	GroupRetriever(DefaultStep):
-	def __init__(self, PREV):
+	def __init__(self, ARGS, PREV):
 		DefaultStep.__init__(self)
 		#self.setInputs(INS)
-		#self.setArguments(ARGS)
+		self.setArguments(ARGS)
 		self.setPrevious(PREV)
-		self.setName("Retrieve_Groups")
+		self.setName("GroupCheck")
 	 	self.start()
 	 	
 	def performStep(self):
+		minimum = self.getInputValue("mingroupmembers")
+		if minimum==None:
+			minimum=0
+		
 		group = self.find("group")[0]
-		groups = set()
+		groups = defaultdict(int)
+		otpt = open("{0}/{1}.groupstats".format(self.stepdir, group), "w")
 		for line in loadLines("%s/%s" % (self.stepdir, group)):
-			groups.add(line.strip().split("\t")[1])
-		groups  = "-".join(groups)
-		self.message(groups)
-		self.setOutputValue("groups", groups)
+			x = line.strip().split("\t")[1]
+			groups[x]+=1
+			
+		keys  = sorted(groups, key=groups.get)
+		keys.reverse()
+		
+		passinggroups=list()
+		failinggroups = list()
+		
+		for k in keys:
+			v = groups[k]
+			if v>=minimum:
+				flag="ok"
+				passinggroups.append(k)
+			else:
+				flag="x"	
+				failinggroups.append(k)
+				
+			self.message("{0:<15}:{1:>10}:{2}".format( k, v, flag))
+			otpt.write("{0}\t{1}\t{2}\n".format(k,v, flag))
+			
+		otpt.close()
+		
+		if len(passinggroups)==0:
+			self.message("There are not enough reads to analyze. You can try adjusting -g [currently set to {0}]".format(minimum))
+			self.failed=True
+		
+		if self.getInputValue("report") in [None, "passing"]:
+			groupnames  = "-".join(passinggroups)	
+		else:
+			groupnames  = "-".join(failinggroups)	
+		self.setOutputValue("groups", groupnames)
 	 	
 class	CDHIT_454(DefaultStep):
 	def __init__(self, nodeCPUs, ARGS, PREV):
