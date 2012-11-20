@@ -4,6 +4,51 @@
 ## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
+library(ggplot2)
+library(grid)
+library(scales)
+
+multiplot <- function(..., plotlist=NULL, cols=1, layout=NULL)
+{
+	require(grid)
+	
+	# Make a list from the ... arguments and plotlist
+	plots = c(list(...), plotlist)
+	
+	numPlots = length(plots)
+	print (numPlots)
+	
+	# If layout is NULL, then use 'cols' to determine layout
+	if (is.null(layout)) 
+	{
+		layout = grid.layout(ceiling(numPlots/cols), cols)
+	}
+	
+	# create a panel that will be used to map ids later
+	
+	panel = matrix(1:(layout$nrow * layout$ncol), nrow = layout$nrow, ncol = layout$ncol, byrow=TRUE )
+	
+	if (numPlots==1) 
+	{
+		print(plots[[1]])
+	} 
+	else 
+	{
+		# Set up the page
+		grid.newpage()
+		pushViewport(viewport(layout = layout))
+		
+		for (i in 1:numPlots) 
+		{
+			matching <- as.data.frame(which(panel == i, arr.ind = TRUE))
+			
+			print ( plots[[i]], vp = viewport(	layout.pos.row = matching$row, 
+							layout.pos.col = matching$col)
+			)
+		}
+	}
+}
+
 
 makePlot = function(filename = "read.groups.tab.txt", minreads = 0, mingroups = 0, nlevels = 500, mode="OTU", xlim=c(0,0), ylim=c(0,0))
 {
@@ -182,7 +227,151 @@ makePlot = function(filename = "read.groups.tab.txt", minreads = 0, mingroups = 
 	 
 }
 
-makeBatch = function(filename) 
+
+getData = function(files, mode="clccoverage")
+{
+	global = data.frame()
+	for (f in files)
+	{
+		
+		print (f)
+		if (mode =="clccoverage")
+		{
+			tmp = read.table(f, as.is=T, header=F, sep="", skip=34)
+			names(tmp) <- c("Contig", "Sites", "Reads", "Coverage")
+			
+		}
+		else if (mode == "otu")
+		{
+			tmp = read.table(f, as.is=T, header=F, sep="\t")
+			names(tmp) <- c("Reads", "Groups")
+			
+		}
+		else
+		{
+			return (global)
+		}
+		
+		a = strsplit( f, "\\.")[[1]][2]
+		b = strsplit( a,"-")[[1]][1]
+		cat(f, "->", a, "->", b, "\n")
+		tmp$File = rep(b, nrow(tmp))
+		
+		if (nrow(global)==0)
+		{
+			global=tmp
+		}
+		else
+		{
+			global=rbind(tmp,global) 
+		}
+			
+	}
+	return (global)
+}
+
+makeGGplotOTU = function(global)
+{
+	print ("not there yet")
+}
+	
+makeGGplotCOVERAGE = function(global)
+{
+	
+	### how do files compare w/r to contig sizes
+	plots = list()
+	
+	for (S in c("Reads", "Sites", "Coverage"))
+	{
+		x1 = (ggplot(global,  aes_string(y=S, x="File", color="File"))
+					+ geom_boxplot() 
+					+ scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+							labels = trans_format("log10", math_format(10^.x)))
+					+ coord_flip()
+					+ theme(axis.ticks = element_blank(), axis.text.y = element_blank())
+					
+					)
+		
+		x2 = (ggplot(global,  aes_string(x=S, y="..count..",  fill="File", group="File" )) 
+					+ stat_bin(aes(y=..count..), geom="area", position="stack", weight=2)
+					+ scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+							labels = trans_format("log10", math_format(10^.x)))
+					)
+		
+		x3 = (ggplot(global,  aes_string(x=S, y="..count..",  fill="File", group="File" )) 
+					+ stat_bin(aes(y=..count..), geom="area", position="dodge", alpha=0.5, weight=2)
+					+ scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+							labels = trans_format("log10", math_format(10^.x)))
+					)
+		
+		x4 = (ggplot(global,  aes_string(x=S, y="..count..", fill="File", group="File" )) 
+					+ geom_bar(position="fill")
+					+ scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+							labels = trans_format("log10", math_format(10^.x)))
+					)
+	
+		
+	 	plots = append(list(x1, x2, x3, x4), plots)
+		
+	}
+	y1 = (ggplot(global,  aes(y=Reads / Sites, x=File, color=File))
+				+ geom_boxplot() 
+				+ scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+						labels = trans_format("log10", math_format(10^.x)))
+				+ coord_flip()
+				+ theme(axis.ticks = element_blank(), axis.text.y = element_blank())
+				
+				)
+	y2 = (ggplot(global,  aes(x= Reads/Sites , y=..count..,  fill=File, group=File )) 
+				+ stat_bin(aes(y=..count..), geom="area", position="stack", weight=2)
+				+ scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+						labels = trans_format("log10", math_format(10^.x)))
+				)
+	
+	y3 = (ggplot(global,  aes(x= Reads/Sites , y=..count..,  fill=File, group=File ))  
+				+ stat_bin(aes(y=..count..), geom="area", position="dodge", alpha=0.5, weight=2)
+				+ scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+						labels = trans_format("log10", math_format(10^.x)))
+				)
+	
+	y4 = (ggplot(global,  aes(x= Reads/Sites , y=..count..,  fill=File, group=File ))  
+				+ geom_bar(position="fill")
+				+ scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+						labels = trans_format("log10", math_format(10^.x)))
+				)
+		
+	plots = append(plots, list(y1, y2, y3, y4), )
+	
+	
+	
+	#return (plots)
+	
+#	B = (ggplot(global,  aes(File, Sites, color=File)) 
+#				+ geom_boxplot() 
+#				+ scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+#						labels = trans_format("log10", math_format(10^.x)))
+#				+ coord_flip()
+#				+ theme(axis.ticks = element_blank(), axis.text.y = element_blank())
+#				
+#				)
+#	C = (ggplot(global,  aes(File, Coverage, color=File)) 
+#				+ geom_boxplot() 
+#				+ scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+#						labels = trans_format("log10", math_format(10^.x)))
+#				+ coord_flip()
+#				+ theme(axis.ticks = element_blank(), axis.text.y = element_blank())
+#				
+#				)
+	
+	
+	png("AllAssemblyStats_GG.png", width=20, height = 12, units="in", res=250)
+	multiplot(plotlist=plots, cols=4)
+	dev.off()
+	invisible(plots)
+
+}
+
+makeBatchOTU = function(filename) 
 {
 	pdf(paste(filename,"otusizes.pdf", sep="."), paper="special", width=11, height=10)
 	makePlot(filename = filename, minreads=0, mingroups=0)
@@ -201,8 +390,32 @@ makeBatchCoverage = function(filename)
 	dev.off()
 }
 
-#for (f in dir( pattern=glob2rx("*.tab.txt")))
-#{
-#	print (f)
-#	makeBatchCoverage (f)
-#}
+
+###################################################################
+##### OTU stats
+files = dir( pattern=glob2rx("*.otustats"))
+for (f in files)
+{
+	print (f)
+	makeBatchOTU (f)
+}
+
+if (length(files)>0)
+{
+	inputdata = getData(files, mode="otu") 
+	makeGGplotOTU (inputdata)
+}
+
+##### COVERAGE stats
+files = dir( pattern=glob2rx("*.clcassemblystats"))
+for (f in files)
+{
+	print (f)
+	makeBatchCoverage (f)
+}
+
+if (length(files)>0)
+{
+	inputdata = getData(files, mode="clccoverage") 
+	makeGGplotCOVERAGE (inputdata)
+}
