@@ -492,14 +492,15 @@ def    plotsAndStats(input):
     
     supplementary.append(s28)
     
-    args = {"force" : "list", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage"}
+    args = {"force" : "list", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.01"}
     s29 = MothurStep("rarefaction.single", options.nodesize, dict(), args, [s24])
+    #return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29])
     
-    args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage"}
-    s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24])
-    
+    args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.01"}
+    s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24]) 
     return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29, s30])
-        
+    
+    
 #################################################
 ##        Arguments
 ##
@@ -623,7 +624,8 @@ if options.sampletimes==0:
     supplementary.append(y)
     supplementary.append(z)
     OutputStep("6-ENTIRE", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary,phylotax", [tmp])
-
+    OutputStep("8-TBC", "phylotax,group,list,fasta", [tmp])
+    
 else:
     thefinalset = list()
     for k in xrange(0, options.sampletimes):
