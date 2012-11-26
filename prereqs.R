@@ -4,7 +4,7 @@
 ## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
-installme=function()
+init = function()
 {
 	### verify that all required packages are installed
 	m <- getCRANmirrors(all = FALSE, local.only = FALSE)
@@ -15,26 +15,33 @@ installme=function()
 	cat(URL, "\n")
 	repos["CRAN"] <- gsub("/$", "", URL[1L])
 	options(repos = repos)
-	install.packages("ade4", dependencies=T)
-	install.packages("RColorBrewer", dependencies=T)
-	install.packages("fdrtool", dependencies=T)
-	install.packages("randomForest", dependencies=T)
-	install.packages("vegan", dependencies=T)
-	install.packages("gplots", dependencies=T)
+	
+	source("http://bioconductor.org/biocLite.R")
+	
+	tryCatch(biocLite("BiocUpgrade"), error=function(e){})
 }
-done=FALSE
-try(
-	{	
-		library(fdrtool)
-		library(RColorBrewer)
-		library(ade4)
-		library(vegan)
-		library(randomForest)
-		library(gplots)
-		done=TRUE
-	},
-silent=TRUE)
-if (! done)
+
+
+init()
+cran   = c("ade4", "RColorBrewer", "fdrtool", "randomForest", "vegan", "gplots", "multicore", "MASS")
+bioc = c("Biostrings", "ggplot2", "grid", "scales")
+
+for (p in cran)
+{	
+	pkg<-p
+	tryCatch(library(pkg, character.only = TRUE, quietly=TRUE), error = function(e){install.packages(p, dependencies=T)})
+}
+
+for (p in bioc)
 {
-	installme()
+	pkg<-p
+	tryCatch(library(pkg, character.only = TRUE, quietly=TRUE), error = function(e){biocLite(p)})
 }
+
+for (p in c(cran, bioc))
+{
+	pkg<-p
+	tryCatch(library(pkg, character.only = TRUE), error = function(e){print (e)})
+}
+
+cat("unless you see errors above, this should have worked.\n")
