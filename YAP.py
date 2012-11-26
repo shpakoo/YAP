@@ -192,6 +192,13 @@ def    demultiplex():
     if options.strictlevel==2:
         bdiffs="0"
         pdiffs="1"
+    elif options.strictlevel==3:
+        bdiffs="0"
+        pdiffs="2"
+    elif options.strictlevel==4:
+        bdiffs="1"
+        pdiffs="2" 
+               
     else:
         bdiffs="0"
         pdiffs="0"
@@ -254,10 +261,20 @@ def    demultiplex():
                 DEMUX.append(G)
     
 
-    ALMOST_DONE = FileMerger("fasta,name,group,qfile", DEMUX)
-    READY = MatchGroupsToFasta(dict(), [ALMOST_DONE])
+    A1 = FileMerger("fasta,name,group,qfile", DEMUX)
+    A2 = MatchGroupsToFasta(dict(), [A1])
     
-    return ([READY, forprocessing.getPrimerFilename()])
+    args = {"mingroupmembers": options.mingroupmembers, 
+            "report": "failing"}
+    A3 = GroupRetriever(args, A2)
+    
+    args = {
+            "force" : "fasta,name,group",
+            "find": "groups" 
+            }      
+    A4 = MothurStep("remove.groups", options.nodesize, dict(), args, [A3])
+    
+    return ([A4, forprocessing.getPrimerFilename()])
 
 def    finalize(input):
     clean = CleanFasta(dict(), [input])
@@ -268,7 +285,10 @@ def    finalize(input):
              "force": "fasta,name,group"}
     clean2 = MothurStep("screen.seqs", options.nodesize, dict(), args, [clean])
 
-    OutputStep("2-PRE454", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", clean2)
+    args = {"mingroupmembers": 0, 
+            "report": "passing"}
+    clean2a = GroupRetriever(args, [clean2])
+    OutputStep("2-PRE454", "groupstats,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", clean2a)
 
     ###################### CDHIT-454
     #### unique and de-noise
@@ -294,7 +314,11 @@ def    finalize(input):
     CD_1 = CDHIT_454(options.nodesize, args, [clean2])
     CD_2 = CDHIT_Mothurize(dict(), CD_1)
     
-    OutputStep("3-UNIQUE", "tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_2)  
+    
+    args = {"mingroupmembers": 0, 
+            "report": "passing"}
+    CD_2a = GroupRetriever(args, [CD_2])
+    OutputStep("3-UNIQUE", "groupstats,tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_2a)  
     
     #### add reference sequences to the merged experiments' file
     CD_3 = FileMerger("fasta,name,group,qfile", [CD_2, REF_1, REF_2, REF_3, PRI_1, PRI_2, PRI_3])
@@ -321,19 +345,24 @@ def    finalize(input):
     supplementary.append(CD_6)
     ###########################
     
-    OutputStep("4-ALIGNED", "tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4)    
+    args = {"mingroupmembers": 0, 
+            "report": "passing"}
+    CD_4a = GroupRetriever(args, [CD_4])
+    OutputStep("4-ALIGNED", "groupstats,tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4a)    
        
     cleanCD = cleanup(CD_4)
-
-    OutputStep("5-CLEAN", "fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", cleanCD)
+    args = {"mingroupmembers": 0, 
+            "report": "passing"}
+    cleanCDa = GroupRetriever(args, [cleanCD])
+    OutputStep("5-CLEAN", "groupstats,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", cleanCDa)
     
     clusterCD = CDHITCluster(cleanCD)
     
     x = plotsAndStats(clusterCD)
     INS = {"annotation" : [options.fn_info]}
     ARGS = {"dist": "0.03"}
-    output = R_defaultplots(INS, ARGS, x)
-    output2 = AnnotateClusters(dict(), dict(), output)
+    output1 = R_defaultplots(INS, ARGS, x)
+    output2 = AnnotateClusters(dict(), dict(), output1)
         
     return (output2)
 
@@ -444,7 +473,11 @@ def    CDHITCluster(input):
     return (SORTED)
 
 def    plotsAndStats(input):
-    s23 = GroupRetriever([input])
+    
+    ### all groups!
+    args = {"mingroupmembers": 0, 
+            "report": "passing"}
+    s23 = GroupRetriever(args, [input])
     
     ######## make a shared file 
     args = {"label" : "0.01-0.03-0.05-0.1", "find": "groups"}
@@ -494,11 +527,11 @@ def    plotsAndStats(input):
     
     args = {"force" : "list", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.01"}
     s29 = MothurStep("rarefaction.single", options.nodesize, dict(), args, [s24])
-    return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29])
+    #return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29])
     
-    #args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.1"}
-    #s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24]) 
-    #return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29, s30])
+    args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.05"}
+    s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24]) 
+    return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29, s30])
     
     
 #################################################
@@ -528,12 +561,18 @@ group.add_option("-a", "--annotations", dest="dir_anno", default="/usr/local/dev
 group.add_option("-S", "--SAMPLE", dest="sampletimes", default=0, type="int",
                  help="perform sub.sampling of all reads based on the number of reads in smallest group. if 0 - all reads are used. if 1 - the sampling will be performed once, if 2 or more, then 2 or more independent samplings are going to be performed.\n[%default]", metavar="#")                 
 group.add_option("-m", "--minlen", dest="minlength", default=220, type="int",
-                 help="what is the minimum length of reads to process\n[%default]", metavar="#")                 
-group.add_option("-x", "--strict", dest="strictlevel", default=1, type="int",
+                 help="what is the minimum length of reads to process\n[%default]", metavar="#")     
+
+group.add_option("-g", "--mingroupsize", dest="mingroupmembers", default=100, type="int",
+                 help="after demultiplexing, discard groups with fewer reads than #\n[%default]", metavar="#")
+            
+group.add_option("-x", "--strict", dest="strictlevel", default=2, type="int",
                  help="""how strict to be at demultiplexing: 
-                     1 very strict (barcode no mismatches, primer no mismatches) 
-                     2 less strict (barcode no mismatches, primer 1 mismatch allowed)
-                     [%default]""", metavar="#")                 
+1 very strict (barcode no mismatches, primer no mismatches) 
+2 less strict (barcode no mismatches, primer 1 mismatch allowed)
+3 even less strict (barcode no mismatches, primer 2 mismatches allowed)
+4 last resort (barcode 1 mismatch, primer 2 mismatches allowed)
+[%default]""", metavar="#")                 
 
 group.add_option("-F", "--useFlows", dest="useflows", action="store_true", default=False,
                  help="""if specified flows will be used and pyronoise will be employed. Otherwise qual values will be used with LUCY""", metavar="#") 
@@ -604,6 +643,7 @@ REF_3 = MakeQualFile  ([REF], "40" )
 
 supplementary = list()
 READY, primerfile = demultiplex()
+
 print primerfile
 
 ######################
@@ -615,7 +655,7 @@ PRI_1 = MakeNamesFile([PRI])
 PRI_2 = MakeGroupsFile([PRI], "ref")
 PRI_3 = MakeQualFile([PRI], "40")
 
-OutputStep("1-DEMUX", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [READY])
+OutputStep("1-DEMUX", "groupstats,fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [READY])
 
 if options.sampletimes==0:
     tmp = finalize(READY)    
@@ -623,7 +663,7 @@ if options.sampletimes==0:
     z = R_OTUplots(dict(), dict(), tmp)
     supplementary.append(y)
     supplementary.append(z)
-    OutputStep("6-ENTIRE", "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary,phylotax", [tmp])
+    OutputStep("6-ENTIRE", "groupstats,fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary,phylotax", [tmp])
     OutputStep("8-TBC", "phylotax,group,list,fasta", [tmp])
     
 else:
@@ -640,7 +680,7 @@ else:
         z = R_OTUplots(dict(), dict(), tmp)
         supplementary.append(y)
         supplementary.append(z)
-        OutputStep("SAMPLED_%s" % (k), "fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [tmp])
+        OutputStep("SAMPLED_%s" % (k), "groupstats,fasta,group,name,list,pdf,svg,tiff,taxsummary,globalsummary,localsummary", [tmp])
         thefinalset.append(tmp)
     
 OutputStep("7-SUPP_PLOTS", "tre,pdf,svg,tiff,r_nseqs,rarefaction,r_simpson,r_invsimpson,r_chao,r_shannon,r_shannoneven,r_coverage", supplementary)
