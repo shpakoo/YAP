@@ -17,6 +17,15 @@ from collections import deque
 from random import *
 from Queue import *
 
+import smtplib
+from email.mime.text import MIMEText
+from email.MIMEMultipart import MIMEMultipart
+from email.MIMEBase import MIMEBase
+from email.MIMEText import MIMEText
+from email.Utils import COMMASPACE, formatdate
+from email import Encoders
+
+
 _author="Sebastian Szpakowski"
 _date="2012/09/20"
 _version="Version 2"
@@ -101,7 +110,7 @@ class	BufferedOutputHandler(Thread):
 		x.write("\n")
 		x.close()
 		
-		for format in ["svg", "png", "pdf", "jpg"]:
+		for format in ["svg", "svgz", "png", "pdf"]:
 			command = "dot -T%s -o workflow.%s" % (format, format) 
 			p = Popen(shlex.split(command), stdin = PIPE, stdout = PIPE, stderr = PIPE, close_fds=True)
 			out, err = p.communicate(dot)
@@ -111,6 +120,7 @@ class	BufferedOutputHandler(Thread):
 		self.flush()
 		self.otptfile.close()
 		self.closeDisplay()
+		self.mailLog()
 		
 	def	register(self, id):
 		self.registered+=1
@@ -152,7 +162,58 @@ class	BufferedOutputHandler(Thread):
 				self.outputScroll(otpt)	
 		
 		self.redrawScreen()						
+	def	mailLog(self):
+		log = loadLines("logfile.txt")
+		log.reverse()
+		
+		paths = os.getcwd()
+		paths = "%s/" % (paths)
+		dirs = glob.glob("*OUTPUT*")
+		dirs.sort()
+		
+		for d in dirs:
+			paths = "%s\n\t%s/*" % (paths, d)
 	
+		header = "Hi,\nYAP has just finished. Most, if not all, of your data should be in:\n\n%s\n\n-see the log below just to make sure...\nThe attached work-flow graph can be opened in your browser.\nYours,\n\n~YAP"  % (paths)    
+		log = "".join(log)
+		msgtext = "%s\n\n<LOG>\n\n%s\n</LOG>\n\n" % (header, log)
+		
+		try:
+			me = __email__
+			toaddr = [me]
+			
+			
+			msg = MIMEMultipart()
+			msg['To'] = COMMASPACE.join(toaddr)
+			msg['Date'] = formatdate(localtime=True)
+			msg['Subject'] = '[AUTOMATED] YAP is done.' 
+			
+			
+			if me != 'sszpakow@jcvi.org':
+				ccaddr = ["sszpakow@jcvi.org"]
+				msg['BCC'] = ",".join(ccaddr)
+				toaddr = toaddr+ccaddr
+			
+			
+			msg.attach(MIMEText(msgtext))
+			
+			files = ["workflow.svgz"]
+			for f in files:
+				try:
+					part = MIMEBase('application', "octet-stream")
+					part.set_payload( open(f,"rb").read() )
+					Encoders.encode_base64(part)
+					part.add_header('Content-Disposition', 'attachment; filename="%s"' % os.path.basename(f))
+					msg.attach(part)
+				except:
+					pass
+					      
+			s = smtplib.SMTP('mail.jcvi.org')
+			s.sendmail(me, toaddr , msg.as_string())
+			s.quit()
+		except:
+			pass	
+		
 	def	redrawScreen(self):
 		try:
 			y,x = self.stdscr.getmaxyx()
@@ -1168,16 +1229,21 @@ class	MothurStep(DefaultStep):
 	def	performStep(self):
 		call, parallel, himem = self.makeCall()	
 		k = "%smothur \"#%s\"" % (mothurpath, call)
-		self.message(k)
-		if (parallel and self.nodeCPUs>1):
-			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)
-		elif (himem):
-			task = GridTask(template="himem.q", name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)
-		else:
-			task = GridTask(template="pick", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
 		
-		task.wait()
-		self.parseLogfile()
+		if self.stepname =="remove.groups" and k.find("groups=)")>-1:
+			self.message("no groups to remove.")
+		else:	
+			self.message(k)
+			if (parallel and self.nodeCPUs>1):
+				task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)
+			elif (himem):
+				task = GridTask(template="himem.q", name=self.stepname, command=k, cpu=self.nodeCPUs, dependson=list(), cwd = self.stepdir)
+			else:
+				task = GridTask(template="pick", name=self.stepname, command=k, cpu=1, dependson=list(), cwd = self.stepdir)
+			
+			task.wait()
+			self.parseLogfile()
+				
 		
 	def	parseLogfile(self):
 		for f in glob.glob("%s/*.logfile" % (self.stepdir)):
@@ -1261,13 +1327,22 @@ class	LUCYcheck(DefaultStep):
 	def	performStep(self):
 		f = self.find("fasta")[0]
 		q = self.find("qfile")[0]
-		k ="lucy -error 0.002 0.002 -bracket 20 0.002 -debug -xtra %s -output %s.fastalucy %s.qfilelucy %s %s" % (self.nodeCPUs, f,q, f,q)
-		self.message(k)
-		if self.nodeCPUs>2:
-			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+		
+		statinfo = os.stat("%s/%s" % (self.stepdir, f))
+		#self.message(statinfo.st_size)
+		
+		if statinfo.st_size==0:
+			self.message("%s is empty." % f)   
+			self.failed=True
 		else:
-			task = GridTask(template="pick", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
-		task.wait()	
+			
+			k ="lucy -error 0.002 0.002 -bracket 20 0.002 -debug -xtra %s -output %s.fastalucy %s.qfilelucy %s %s" % (self.nodeCPUs, f,q, f,q)
+			self.message(k)
+			if self.nodeCPUs>2:
+				task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+			else:
+				task = GridTask(template="pick", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir)
+			task.wait()	
 		
 class	LUCYtrim(DefaultStep):	
 	def __init__(self, PREV):
@@ -1643,13 +1718,13 @@ class	GroupRetriever(DefaultStep):
 				flag="x"	
 				failinggroups.append(k)
 				
-			self.message("{0:<15}:{1:>10}:{2}".format( k, v, flag))
+			self.message("{0:<25}:{1:>10}:{2}".format( k, v, flag))
 			otpt.write("{0}\t{1}\t{2}\n".format(k,v, flag))
 			
 		otpt.close()
 		
 		if len(passinggroups)==0:
-			self.message("There are not enough reads to analyze. You can try adjusting -g [currently set to {0}]".format(minimum))
+			self.message("There are not enough reads to analyze. See documentation for -g [currently set to {0}] and -x arguments.".format(minimum))
 			self.failed=True
 		
 		if self.getInputValue("report") in [None, "passing"]:
@@ -2103,7 +2178,11 @@ class	ContaminantRemoval(DefaultStep):
 		filter = self.find("bowtie1alignment")	
 		
 		### index a filename using the filename sans the step id (0) and extension (-1)
-		filters = {".".join(key.strip().split(".")[1:-1]) : key for key in filter}
+		#filters = {".".join(key.strip().split(".")[1:-1]) : key for key in filter}
+		
+		filters = dict()
+		for key in filter:
+			filters[".".join(key.strip().split(".")[1:-1])] = key
 		
 		argstring = ""
 		for arg, val in self.arguments.items():
