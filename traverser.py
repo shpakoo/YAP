@@ -67,6 +67,13 @@ class	Node:
 						for file in files:
 							if not file.startswith("[var]"):
 								file = file.split("/")[-1] 
+							
+							elif type=="groups":
+								groups = file.split("-")
+								file = "%s (%s) %s" % (type, len(groups), file[5:]) 
+								
+							if len(file)>100:
+								file = "%s..." % file[:96]
 								
 							self.outputs[type].add(file)	
 							self.outputids[file] = "<f%s>" % (counter)
@@ -87,12 +94,18 @@ class	Node:
 				if len(files)<5:
 					for file in files:
 						if file.startswith("[var]"):
-							pass
+							groups = file.split("-")
+							file = "%s (%s) %s" % (type, len(groups), file[5:])
+							
 						elif len(file.split("~"))>1:
 							file = file.split("~")[0]
 							
 						else:	
 							file = file.split("/")[-1] 
+							
+						if len(file)>100:
+								file = "%s..." % file[:96]
+							
 						self.inputs[type].add(file)	
 				else:
 				
