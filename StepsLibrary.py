@@ -2623,7 +2623,7 @@ def	init(id, e):
 	
 	__projectid__ = id
 	__email__ = e
-	admin = 'shpakoo@me.com'
+	admin = 'sszpakow@jcvi.org'
 
 def	getNext():
 	global __counter__
