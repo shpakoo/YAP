@@ -189,10 +189,10 @@ class	BufferedOutputHandler(Thread):
 			msg['Subject'] = '[AUTOMATED] YAP is done.' 
 			
 			
-			if me != 'sszpakow@jcvi.org':
-				ccaddr = ["sszpakow@jcvi.org"]
-				msg['BCC'] = ",".join(ccaddr)
-				toaddr = toaddr+ccaddr
+			if me != admin:
+				ccaddr = [admin]
+				msg['BCC'] = COMMASPACE.join(ccaddr)
+				toaddr = toaddr + ccaddr
 			
 			
 			msg.attach(MIMEText(msgtext))
@@ -2619,9 +2619,11 @@ def	unlist(struct):
 def	init(id, e):
 	global __projectid__
 	global __email__
+	global admin
 	
 	__projectid__ = id
 	__email__ = e
+	admin = 'shpakoo@me.com'
 
 def	getNext():
 	global __counter__
