@@ -189,8 +189,8 @@ class	BufferedOutputHandler(Thread):
 			msg['Subject'] = '[AUTOMATED] YAP is done.' 
 			
 			
-			if me != admin:
-				ccaddr = [admin]
+			if me != __admin__:
+				ccaddr = [__admin__]
 				msg['BCC'] = COMMASPACE.join(ccaddr)
 				toaddr = toaddr + ccaddr
 			
@@ -1055,8 +1055,6 @@ class	DefaultStep(Thread):
 			
 		#otpt = "\n".join(set(otpt.strip().split("\n")))		
 		return otpt	
-
-
 	
 class	FileImport(DefaultStep):	
 	def	__init__(self, INS):
@@ -1086,7 +1084,7 @@ class	FileImport(DefaultStep):
 				self.message(k)
 				out,err = p.communicate()
 				p.wait()
-#				
+				
 class	ArgumentCheck(DefaultStep):
 	def	__init__(self, SHOW, PREV):
 		ARGS = {"show":SHOW}
@@ -1770,7 +1768,74 @@ class	CDHIT_454(DefaultStep):
 		
 		for task in tasks:
 			task.wait()	
+			
+class	CDHIT_EST(DefaultStep):
+	def __init__(self, nodeCPUs, ARGS, PREV):
+		DefaultStep.__init__(self)
+		
+		if ARGS.has_key("T"):
+			self.nodeCPUs = ARGS["T"]
+		else:
+			self.nodeCPUs=nodeCPUs
+			ARGS["T"]=self.nodeCPUs		
+		
+		#self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("CDHIT_EST")
+		self.start()
+				
+	def	performStep(self):
+		f = self.find("fasta")[0]
+		args = ""
+		dist = 1
+		for arg, val in self.arguments.items():
+			args = "%s -%s %s" % (args, arg, val) 
+			if arg == "c":
+				dist = dist - (float(val)) 
+		
+		k ="%scd-hit-est -i  %s -o %s._%s_.cdhit %s" % (cdhitpath, f, f, dist, args)
+		
+		self.message(k)
+		if self.nodeCPUs>2:
+			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
+		else:
+			task = GridTask(template="himem.q", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
+		task.wait()	
 
+class	CDHIT_Perls(DefaultStep):
+	def __init__(self, ARGS, PREV):
+		DefaultStep.__init__(self)
+		#self.setInputs(INS)
+		self.setArguments(ARGS)
+		self.setPrevious(PREV)
+		self.setName("CDHITperls")
+		#self.nodeCPUs=nodeCPUs
+	 	self.start()
+		
+	def	performStep(self):
+		x = self.find("cdhitclstr")
+		tasks=list()
+		for cluster in x:
+			k = "%sclstr2tree.pl %s > %s.tre" % (cdhitpath, cluster, cluster)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
+			tasks.append(task)
+			
+			k = "%sclstr_size_histogram.pl %s > %s.hist.tab.txt " % (cdhitpath, cluster, cluster)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
+			tasks.append(task)
+			
+			k = "%sclstr_size_stat.pl %s  > %s.size.tab.txt" % (cdhitpath, cluster, cluster)
+			self.message(k)
+			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
+			tasks.append(task)
+			
+			
+		for task in tasks:
+			task.wait()					
+	
 class	CDHIT_Mothurize(DefaultStep):
 	def __init__(self, ARGS, PREV):
 		DefaultStep.__init__(self)
@@ -1809,40 +1874,6 @@ class	CDHIT_Mothurize(DefaultStep):
 			
 		else:
 			self.failed=True
-			
-class	CDHIT_EST(DefaultStep):
-	def __init__(self, nodeCPUs, ARGS, PREV):
-		DefaultStep.__init__(self)
-		
-		if ARGS.has_key("T"):
-			self.nodeCPUs = ARGS["T"]
-		else:
-			self.nodeCPUs=nodeCPUs
-			ARGS["T"]=self.nodeCPUs		
-		
-		#self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("CDHIT_EST")
-		self.start()
-				
-	def	performStep(self):
-		f = self.find("fasta")[0]
-		args = ""
-		dist = 1
-		for arg, val in self.arguments.items():
-			args = "%s -%s %s" % (args, arg, val) 
-			if arg == "c":
-				dist = dist - (float(val)) 
-		
-		k ="%scd-hit-est -i  %s -o %s._%s_.cdhit %s" % (cdhitpath, f, f, dist, args)
-		
-		self.message(k)
-		if self.nodeCPUs>2:
-			task = GridTask(template=defaulttemplate, name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
-		else:
-			task = GridTask(template="himem.q", name=self.stepname, command=k, cpu=self.nodeCPUs,  dependson=list(), cwd = self.stepdir, debug=True)
-		task.wait()	
 
 class	R_defaultplots(DefaultStep):
 	def __init__(self, INS, ARGS, PREV):
@@ -1956,82 +1987,7 @@ class	AlignmentTrim(DefaultStep):
 		self.message(k)
 		task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  dependson=list(), cwd = self.stepdir)
 		task.wait()	
-
-class	TCOFFEE(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("TCOFFEE")
-		self.start()
-						
-	def	performStep(self):
-		pattern=[]
-		files = self.find("fasta")
-		tasks = list()
-		argstring = ""
-		for arg, val in self.arguments.items():
-			if arg == "pattern":
-				pattern = val.strip().split(",")
-			else:	
-				argstring = "%s %s %s " % (argstring, arg, val)
-			
-		template = "t_coffee " 
-			
-		for f in files:
-			if len(pattern)>0:
-				for k in pattern:
-					if f.find(k)>-1:
-						command = "%s %s %s " % (template, f, argstring)
-						self.message(command)
-						task = GridTask(template="pick", name=self.stepname, command=command, cpu=4,  dependson=list(), cwd = self.stepdir, debug=False)
-						task.wait()
-			else:
-				command = "%s %s %s " % (template, f, argstring)
-				self.message(command)
-				task = GridTask(template="pick", name=self.stepname, command=command, cpu=4,  dependson=list(), cwd = self.stepdir, debug=False)
-				task.wait()	
-
-class	CLUSTALW2(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("CLUSTALW2")
-		self.start()
-						
-	def	performStep(self):
-		pattern = []
-		files = self.find("fasta")
-		tasks = list()
-		argstring = ""
-		for arg, val in self.arguments.items():
-			if arg == "pattern":
-				pattern = val.strip().split(",")
-			else:	
-				argstring = "%s %s %s " % (argstring, arg, val)
-			
-		template = "%sclustalw2 %s " % (binpath, argstring)
-			
-		for f in files:
-			if len(pattern)>0:
-				for k in pattern:
-					if f.find(k)>-1:
-						command = "%s -INFILE=%s" % (template, f)
-						self.message(command)
-						task = GridTask(template="pick", name=self.stepname, command=command, cpu=1,  dependson=list(), cwd = self.stepdir, debug=False)
-						tasks.append(task)
-			else:
-				command = "%s -INFILE=%s" % (template, f)
-				self.message(command)
-				task = GridTask(template="pick", name=self.stepname, command=command, cpu=1,  dependson=list(), cwd = self.stepdir, debug=False)
-				tasks.append(task)
-				
-		for task in tasks:
-			task.wait()						
-					
+		
 class	AnnotateClusters(DefaultStep):
 	def __init__(self, INS, ARGS, PREV):
 		DefaultStep.__init__(self)
@@ -2069,528 +2025,8 @@ class	AnnotateClusters(DefaultStep):
 			
 			for task in tasks:
 				task.wait()	
-		#self.failed=True
 
-######		
-######	these are mostly for contaminant checking/metagenomcis		
-###########################################################							
-class	Bowtie1 (DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("BOWTIE1aligner")
-		self.counter=0
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		
-		m1 = self.find("mate1")
-		m2 = self.find("mate2")
-		m3 = self.find("fasta")
-		
-		cpus = 1
-		
-		argstring = ""
-		for arg, val in self.arguments.items():
-			argstring = "%s %s %s " % (argstring, arg, val) 
-			if arg =="-p":
-				cpus = val
-		
-		
-		tasks = list()
-		self.message("processing %s file(s)..." % (len(m1)+len(m3)))
-		for f in m1:
-			name = ".".join(f.strip().split(".")[:-1])
-
-			if "%s.mate2" % (name) in m2:
-				k = "bowtie %s -1 %s.mate1 -2 %s.mate2 > %s.bowtie1alignment" % (argstring, name, name, name)
-		 		#self.message(k)
-		 		task = GridTask(template="pick", name=self.stepname, command=k, cpu=cpus, dependson=list(), cwd = self.stepdir, debug=False)	
-				tasks.append(task)
-			else:
-				self.message("skipping: %s" % (name))
-				
-		for f in m3:
-			name = ".".join(f.strip().split(".")[:-1])
-			k = "bowtie %s  %s > %s.bowtie1alignment" % (argstring, f, name)
-			#self.message(k)
-			task = GridTask(template="pick", name=self.stepname, command=k, cpu=cpus, dependson=list(), cwd = self.stepdir, debug=False)	
-			tasks.append(task)
-								
-		for task in tasks:
-			task.wait()	
-
-### remove spaces from header (i.e. keep first oken only)
-### and make all 50 base fragments (overlapping by 25)	
-
-class	TilingFasta(DefaultStep):
-	def __init__(self, INS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		#self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("TilingFasta")
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		f = self.find("fasta")
-		for file in f:
-			input = FastaParser("%s/%s" % (self.stepdir, file))
-			output = open("%s/%s.tile.fasta"% (self.stepdir, file), "w")
 			
-			for head, seq in input:
-				head = head.split()[0]
-				counter=1
-				while len(seq)>50:
-					tmphead = "%s:%s-%s" % (head, counter, counter+100)
-					tmpseq = seq[:50]
-					
-					seq = seq[25:]
-					counter+=25
-
-					
-					output.write(">%s\n%s\n" % (tmphead, tmpseq))
-			
-			output.close()
-
-class	ContaminantRemoval(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("decontaminate")
-
-	 	self.start()	
-		 	
-	def	performStep(self):
-		tasks = list()
-
-		m1 = self.find("fasta")
-		m1.extend(self.find("mate1"))
-		m1.extend(self.find("mate2"))
-		
-		filter = self.find("bowtie1alignment")	
-		
-		### index a filename using the filename sans the step id (0) and extension (-1)
-		#filters = {".".join(key.strip().split(".")[1:-1]) : key for key in filter}
-		
-		filters = dict()
-		for key in filter:
-			filters[".".join(key.strip().split(".")[1:-1])] = key
-		
-		argstring = ""
-		for arg, val in self.arguments.items():
-			argstring = "%s %s %s " % (argstring, arg, val) 
-		
-		tasks = list()
-		missing = 0
-#		if len(filter)>1:
-#			self.message("too many (%s) filters..." % (len(filter)))
-#			self.failed = True
-			
-		for file in m1:
-			
-			### find appropriate filter	
-			name = ".".join(file.strip().split(".")[1:-1])
-			self.message("%s -> %s" % (name, filters[name]))
-			
-			if name in filters.keys():
-				k = "python %sMateFilter.py %s -i %s -f %s " % (scriptspath, argstring, file, filters[name])
-				if len(m1)==1:
-					self.message(k)
-			
-				task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=1,  cwd = self.stepdir)
-				tasks.append(task)
-			else:
-				missing +=1	
-			
-			if missing>0:
-				self.message("%s missing filters observed..." % (missing))
-				self.failed = True
-			
-		for task in tasks:
-			task.wait()	
-
-################################################
-class	fastx_quality_stats(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("fastx_qstats")
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		
-		m1 = self.find("mate1")
-		m1.extend(self.find("mate2"))
-				
-		argstring = ""
-		for arg, val in self.arguments.items():
-			argstring = "%s %s %s " % (argstring, arg, val) 
-			
-		self.message(m1)
-		for file in m1:
-				
-			k = "fastx_quality_stats %s -i %s -o %s.fastx_stats" % (argstring, file, file)
-			self.message(k)
-			task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=1,  cwd = self.stepdir)
-			tasks.append(task)
-			
-		for task in tasks:
-			task.wait()	
-				
-class	fastq_quality_filter(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("fastq_qfilter")
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		
-		m1 = self.find("mate1")
-		m1.extend(self.find("mate2"))
-				
-		argstring = ""
-		for arg, val in self.arguments.items():
-			argstring = "%s %s %s " % (argstring, arg, val) 
-
-		tasks = list()
-		self.message("processing %s files..." % len(m1))
-		for file in m1:
-			suffix = file.split(".")[-1]
-			prefix = ".".join(file.split(".")[:-1])
-			k = "fastq_quality_filter %s -i %s -o %s.q.%s" % (argstring, file, prefix, suffix)
-			if len(m1)<10:
-				self.message(k)
-			task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=1,  cwd = self.stepdir)
-			tasks.append(task)
-			
-		for task in tasks:
-			task.wait()	
-			
-
-class	fastq2fasta(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("fastq2fasta")
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		
-		m1 = self.find("mate1")
-		m1.extend(self.find("mate2"))
-		m1.extend(self.find("fastq"))
-				
-		argstring = ""
-		for arg, val in self.arguments.items():
-			argstring = "%s %s %s " % (argstring, arg, val) 
-
-		tasks = list()
-		self.message("processing %s files..." % len(m1))
-		for file in m1:
-			suffix = file.split(".")[-1]
-			prefix = ".".join(file.split(".")[:-1])
-			if suffix=="fastq":
-				k = "fastq_to_fasta %s -i %s -o %s.fasta" % (argstring, file, prefix)
-			else:
-				k = "fastq_to_fasta %s -i %s -o %s.fasta.%s" % (argstring, file, prefix, suffix)
-			if len(m1)<10:
-				self.message(k)
-			task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=1,  cwd = self.stepdir)
-			tasks.append(task)
-			
-		for task in tasks:
-			task.wait()	
-		
-class	mateInterweave(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("mateInterweave")
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		m1 = self.find("mate1")
-		m2 = self.find("mate2")		
-		tasks = list()
-		
-		self.message("processing %s/%s files..." % (len(m1), len(m2)))
-		
-		for f in m1:
-			f = ".".join(f.strip().split(".")[:-1])
-			if "%s.mate2" %( f) in m2:
-		
-				argstring = ""
-				for arg, val in self.arguments.items():
-					argstring = "%s %s %s " % (argstring, arg, val) 
-		
-				argstring = "%s -f %s.mate1,%s.mate2" % (argstring, f, f)
-				# if len(cluster)==2:
-		# 			argstring = "%s -c %s " % (argstring, ",".join(cluster))
-		# 		
-				
-				k = "python %sinterweaveMates.py %s" % (scriptspath, argstring)
-				if len(m1)<10:
-					self.message(k)
-				task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=1,  cwd = self.stepdir)
-				tasks.append(task)
-			
-		for task in tasks:	
-			task.wait()
-				
-class	CLC_Assemble(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("CLC_Assemble")
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		x= self.find("properties")
-		cpus=1
-		template="pick"
-		if len(x)!=1:
-			self.failed=True
-		else:
-			m1 = self.find("fasta")[0]			
-			prefix = ".".join(m1.split(".")[:-1])
-			argstring=""
-			for arg, val in self.arguments.items():
-				argstring = "%s %s %s " % (argstring, arg, val) 
-				if arg=="--cpus":
-					cpus=val
-					
-			done = False
-			
-			while not done:
-			
-				k = "/usr/local/packages/clc-ngs-cell/clc_novo_assemble -o %s.contigs.fasta %s -q %s" % (prefix, argstring, m1)
-				self.message(k)
-				
-				task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=cpus,  cwd = self.stepdir, debug=True)
-				task.wait()
-				
-				for file in glob.glob("%s/*.e*" % (self.stepdir)):
-					#self.message(file)
-					contents = "\n".join(loadLines("%s" % (file)))
-					if contents.find("No more available licenses")>-1:	
-						self.message("No more available licenses, retrying in a bit...")
-						command = "rm %s" % (file)
-						p = Popen(shlex.split(command), close_fds=True)
-						p.wait()
-						time.sleep(60)
-					else:
-						done = True
-								
-
-class	CLC_Assemble_Ref(DefaultStep):
-	def __init__(self, INS, ARGS, PREV):		
-		DefaultStep.__init__(self)
-		self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("CLC_Assemble_Ref")
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		x= self.find("properties")
-		cpus=1
-		template="pick"
-		
-		if len(x)!=1:
-			self.failed=True
-		else:
-			fastas = self.find("fasta")
-			contigs = list()
-			reads = list()
-			if len(fastas)<=2:
-				for f in fastas:
-					if f.find("contig")>-1:
-						contigs.append(f)
-					else:
-						reads.append(f)
-				
-						
-				contigs = contigs[0]
-				reads = reads[0]		
-				m1 = self.find("mate1", original=True)[0]	
-				m2 = self.find("mate2", original=True)[0]			
-							
-				prefix = ".".join(contigs.split(".")[:-1])
-				argstring=""
-				for arg, val in self.arguments.items():
-					argstring = "%s %s %s " % (argstring, arg, val) 
-					if arg=="--cpus":
-						cpus=val
-						
-				### clean reads		
-				done = False
-				while not done:
-					k = "/usr/local/packages/clc-ngs-cell/clc_ref_assemble_long  %s -o %s.clean.cas -q %s -d %s" % (argstring, prefix, reads, contigs)
-					self.message(k)
-					
-					task = GridTask(template="pick", name="%s" % (self.stepname), command=k, cpu=cpus,  cwd = self.stepdir, debug=True)
-					task.wait()
-					
-					for file in glob.glob("%s/*.e*" % (self.stepdir)):
-						#self.message(file)
-						contents = "\n".join(loadLines("%s" % (file)))
-						if contents.find("No more available licenses")>-1:	
-							self.message("No more available licenses, retrying in a bit...")
-							command = "rm %s" % (file)
-							p = Popen(shlex.split(command), close_fds=True)
-							p.wait()
-							time.sleep(60)
-						else:
-							done = True
-				
-				### original / all reads		
-#				done = False
-#				while not done:			
-#					k = "/usr/local/packages/clc-ngs-cell/clc_ref_assemble_long  %s -o %s.original.cas -q -i %s %s -d %s" % (argstring, prefix, m1, m2, contigs)
-						
-
-			else:
-				self.failed=True
-
-
-class	CLC_Assemble_Info(DefaultStep):
-	def __init__(self, ARGS, PREV):
-		DefaultStep.__init__(self)
-		#self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("CLC_Assemble_Info")
-		#self.nodeCPUs=nodeCPUs
-	 	self.start()
-		
-	def	performStep(self):
-	
-		for f in self.find("cas"):
-			k = "/usr/local/packages/clc-ngs-cell/assembly_info %s > %s.clcassemblystats" % (f,f)
-			self.message(k)
-			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
-			task.wait()
-			
-				
-class	FastaSummaryRPlots(DefaultStep):
-	def __init__(self, ARGS, PREV):
-		DefaultStep.__init__(self)
-		#self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("FastaSummary")
-		#self.nodeCPUs=nodeCPUs
-	 	self.start()
-		
-	def	performStep(self):
-		self.find("fasta")
-		k = "R CMD BATCH %sStatFastaFiles.R" % (scriptspath)
-		self.message(k)
-		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
-		task.wait()
-		
-class	ClearcutTree(DefaultStep):
-	def __init__(self, ARGS, PREV):
-		DefaultStep.__init__(self)
-		#self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("ClearcutTree")
-		#self.nodeCPUs=nodeCPUs
-	 	self.start()
-		
-	def	performStep(self):
-		x = self.find("fasta")
-		for fasta in x:
-			k = "%sclearcut --alignment --DNA --in=%s --out=%s.tre" % (binpath, fasta, fasta)
-			self.message(k)
-			task = GridTask(template="himem.q", name=self.stepname, command=k, cwd = self.stepdir)
-			task.wait()	
-			
-class	CDHIT_Perls(DefaultStep):
-	def __init__(self, ARGS, PREV):
-		DefaultStep.__init__(self)
-		#self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("CDHITperls")
-		#self.nodeCPUs=nodeCPUs
-	 	self.start()
-		
-	def	performStep(self):
-		x = self.find("cdhitclstr")
-		tasks=list()
-		for cluster in x:
-			k = "%sclstr2tree.pl %s > %s.tre" % (cdhitpath, cluster, cluster)
-			self.message(k)
-			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
-			tasks.append(task)
-			
-			k = "%sclstr_size_histogram.pl %s > %s.hist.tab.txt " % (cdhitpath, cluster, cluster)
-			self.message(k)
-			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
-			tasks.append(task)
-			
-			k = "%sclstr_size_stat.pl %s  > %s.size.tab.txt" % (cdhitpath, cluster, cluster)
-			self.message(k)
-			task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
-			tasks.append(task)
-			
-			
-		for task in tasks:
-			task.wait()					
-	
-class	GuessFastQEncoding(DefaultStep):
-	def __init__(self, ARGS, PREV):
-		DefaultStep.__init__(self)
-		#self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("FastQEnc")
-		#self.nodeCPUs=nodeCPUs
-	 	self.start()
-		
-	def	performStep(self):
-	
-		x = self.find("mate1")
-		k = "python %sFastQEncoding.py %s > %s.offset" % (scriptspath, x[0], x[0])
-		self.message(k)
-		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
-		task.wait()
-		
-		otpt = ""
-		for line in loadLines("%s/%s.offset" % (self.stepdir, x[0])):
-			otpt = "%s%s" % (otpt, line.strip())
-		
-		self.message("%s -> %s" % (x[0], otpt)) 
-		self.setOutputValue("-Q", otpt)
-		
-	
 #################################################
 ##		Functions
 ##
@@ -2619,31 +2055,25 @@ def	unlist(struct):
 def	init(id, e):
 	global __projectid__
 	global __email__
-	global admin
+	global __admin__
+	global BOH
+	global MOTHUR
+	global QS
 	
 	__projectid__ = id
 	__email__ = e
-	admin = 'sszpakow@jcvi.org'
-
-def	getNext():
-	global __counter__
-	__counter__+=1
+	__admin__ = 'sszpakow@jcvi.org'
 	
-	return __counter__
-
+	BOH = BufferedOutputHandler()
+	MOTHUR = MothurCommandInfo(path=mothurpath)
+	QS = TaskQueueStatus(update = 0.1, maxnodes=250)
+	
 def	revComp(string):
 	global transtab
 	string=string.upper()
 	#reverse
 	string = string [::-1]
 	return string.translate(transtab)
-
-def getQ(file):
-	k = "python %sFastQEncoding.py %s" % (scriptspath, file)
-	p = Popen(shlex.split(k), stdout=PIPE, stderr=PIPE, close_fds=True)
-	out,err = p.communicate()
-	p.wait()
-	return "%s" % (out.strip())
 	
 #################################################
 ##		Arguments
@@ -2663,17 +2093,9 @@ pool_open_files = BoundedSemaphore(value=10, verbose=False)
 mothurpath  = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/mothur-current/"
 cdhitpath 	= "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/cdhit-current/"
 scriptspath = "/usr/local/devel/ANNOTATION/sszpakow/YAP/scripts/"
-binpath = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/"
-
-__counter__ = 0
-
-BOH = BufferedOutputHandler()
-MOTHUR = MothurCommandInfo(path=mothurpath)
-QS = TaskQueueStatus(update = 0.1, maxnodes=250)
+binpath 	= "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/"
 
 defaulttemplate = "himem.q"
-
-
 
 
 #################################################
