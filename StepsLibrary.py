@@ -1469,44 +1469,7 @@ class	FileSort(DefaultStep):
 		for task in tasks:
 			task.wait()
 			time.sleep(1)
-			
-class	FileSplit(DefaultStep):
-	def __init__(self,  TYPES, PREV, chunk=40000):		
-		DefaultStep.__init__(self)
-		ARGS = 	{"types": TYPES}
-		#self.setInputs(INS)
-		self.setArguments(ARGS)
-		self.setPrevious(PREV)
-		self.setName("FILE_split")
-		#self.nodeCPUs=nodeCPUs
-		self.chunk = chunk
-	 	self.start()
-		
-	def	performStep(self):
-		tasks = list()
-		
-		for t in self.getInputValue("types").strip().split(","):
-			files = self.find(t)
-			for f in files:
-				k = "split -a 5 -l %s %s %s.split. " % (self.chunk, f, f)
-				self.message(k)	
-				task = GridTask(template="himem.q", name="filesplit", command=k, cpu=1,  cwd = self.stepdir)
-				tasks.append(task)
-		for task in tasks:
-			task.wait()
-			time.sleep(1)	
-			
-		### rename the files
-		for file in glob.glob("%s/*.split.*" % (self.stepdir)):
-			newfile = file.strip().split(".")
-			suffix = newfile[-3:]
-			suffix.reverse()
- 			newfile = "%s.%s" % ( ".".join(newfile[:-3]), ".".join(suffix))
- 			#self.message("%s -> %s" % (file, newfile) )
-			command = "mv %s %s" % (file, newfile)
-			p = Popen(shlex.split(command), close_fds=True)
-			p.wait()
-			
+						
 class	FileType(DefaultStep):
 	def __init__(self, ARGS, PREV):		
 		DefaultStep.__init__(self)
