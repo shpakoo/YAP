@@ -110,7 +110,7 @@ class    InfoParser:
             otpt=""
             fn_otpt=""
             if bin.startswith("B"):
-                fn_otpt = "%s.B.oligos" % (x.split("/")[-1])
+                fn_otpt = "%s.B.%s.%s.oligos" % (x.split("/")[-1], F, R)
                 T, F, R = bin.strip().split("-")
                 otpt += "forward\t%s\n" % (F)
                 otpt += "reverse\t%s\n" % (R)
@@ -119,11 +119,11 @@ class    InfoParser:
             else:
                 D, P = bin.strip().split("-")
                 if D == "F":
-                    fn_otpt = "%s.F.oligos" % (x.split("/")[-1])
+                    fn_otpt = "%s.F.%s.oligos" % (x.split("/")[-1], P)
                     otpt += "forward\t%s\n" % (P)
                     otpt += "# %s this is the FORWARD primer\n" % (x)
                 else:
-                    fn_otpt = "%s.R.oligos" % (x.split("/")[-1])
+                    fn_otpt = "%s.R.%s.oligos" % (x.split("/")[-1], P)
                     otpt += "forward\t%s\n" % (P)
                     otpt += "# %s this is the REVERSE primer\n" % (x)
 
