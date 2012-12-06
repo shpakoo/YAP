@@ -1033,7 +1033,7 @@ getLevel = function(desc)
 prepareTaxonomy=function(infile, annotation, tag = "")
 {
 	
-	origdataset = read.table(infile, sep="\t", as.is=T, header=T)
+	origdataset = read.table(infile, sep="\t", as.is=T, header = T)
 	#origdataset = origdataset[, c(-4,-5, -(ncol(origdataset)))]
 	names(origdataset)[1:3] <-c("depth","taxonid","label")
 	
@@ -1089,6 +1089,9 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 		origannotation = read.csv(annotationfilename, as.is=TRUE, header=TRUE)
 		origannotation$All = rep("All", nrow(origannotation))
 		origannotation = origannotation[, which(names(origannotation)=="SampleID"):ncol(origannotation)]
+		### this should allow for any sample name...
+		origannotation$SampleID_input = origannotation$SampleID
+		origannotation$SampleID = make.names(origannotation$SampleID)
 		
 		FIXORDER = data.frame(orig = unique(origannotation$SampleID) )		
 		origannotation = aggregate(origannotation, by=list(origannotation$SampleID), function(x) { paste(unique(x), collapse=",", sep=",") } )[,-1]
