@@ -1605,7 +1605,7 @@ class 	AlignmentSummary(DefaultStep):
 			ref="e_coli2"
 			
 		self.message("summarizing an alignment in %s" % (f) )
-		k = "python %s/summarizeAlignment.py -P %s -M %s -t 500 -p %s -i %s -o %s.alsum" % (scriptspath, self.project, self.mailaddress, ref, f,f)
+		k = "python %s/alignmentSummary.py -P %s -M %s -t 500 -p %s -i %s -o %s.alsum" % (scriptspath, self.project, self.mailaddress, ref, f,f)
 		self.message(k)
 		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
 		task.wait() 	
