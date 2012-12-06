@@ -4,9 +4,6 @@
 ## Copyright (c) 2011-2012 J.Craig Venter Institute.
 ########################################################################################
 
-
-
-#!/usr/bin/python
 #################################################
 ## 	A new program
 #################################################
@@ -54,7 +51,7 @@ class 	GeneralPurposeParser:
 		return ("%s\n[LINE %s]" % (self.filename, self.linecounter))
 					
 	#################################################
-	### Iterator over input fata file.
+	### Iterator over input fasta file.
 	### Only reading when requested
 	### Useful for very large FASTA files
 	### with many sequences
