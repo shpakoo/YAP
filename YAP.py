@@ -618,7 +618,7 @@ if options.mode=="16S":
     _trimend = "13127"
     
 ### ITS NSI1 - NLB4 (barcoded)   
-if options.mode=="ITS":
+elif options.mode=="ITS":
     _referenceseq = "yeastITS.fasta"
     _referenceseqname = "AF293_reference"
     _alignment = "FungalITSseed.092012.1.aln.fasta"
@@ -626,7 +626,11 @@ if options.mode=="ITS":
     _taxonomy = "FungalITSdb.092012.1.tax"
     _trimstart = "1716"
     _trimend = "2795"    
-            
+
+else:
+    parser.print_help()
+    sys.exit(2)
+                                                
 init(options.project, options.email)
 
 print "We are in %s mode" % (options.mode) 
