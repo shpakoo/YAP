@@ -1091,7 +1091,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 		origannotation = origannotation[, which(names(origannotation)=="SampleID"):ncol(origannotation)]
 		### this should allow for any sample name...
 		origannotation$SampleID_input = origannotation$SampleID
-		origannotation$SampleID = make.names(origannotation$SampleID)
+		origannotation$SampleID = make.names(origannotation$SampleID, unique=TRUE)
 		
 		FIXORDER = data.frame(orig = unique(origannotation$SampleID) )		
 		origannotation = aggregate(origannotation, by=list(origannotation$SampleID), function(x) { paste(unique(x), collapse=",", sep=",") } )[,-1]
