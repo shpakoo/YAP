@@ -940,7 +940,7 @@ class	DefaultStep(Thread):
 		if not original:		
 			if len(self.inputs[arg])==0:
 				tmp = {arg: self.getOutputs(arg)}
-				self.setInputs(tmp)	
+				self.setInputs(tmp)		
 		else:
 			tmp = {arg: self.getOriginal(arg)}		
 			self.setInputs(tmp)	
@@ -1604,11 +1604,24 @@ class 	AlignmentSummary(DefaultStep):
 		if ref == None:
 			ref="e_coli2"
 			
+		th =  self.getInputValue("thresh")
+		if th == None:
+			th="0.01"	
+			
 		self.message("summarizing an alignment in %s" % (f) )
-		k = "python %s/alignmentSummary.py -P %s -M %s -t 500 -p %s -i %s -o %s.alsum" % (scriptspath, self.project, self.mailaddress, ref, f,f)
+		k = "python %s/alignmentSummary.py -P %s -M %s -t 500 -p %s -i %s -o %s.alsum -T %s" % (scriptspath, self.project, self.mailaddress, ref, f,f, th)
 		self.message(k)
-		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
+		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=True)
 		task.wait() 	
+		
+		for file in glob.glob("%s/*AlignmentSummary.o*"% (self.stepdir)):
+			x = loadLines(file)[-1].strip().split("\t")
+			self.message("Potential trimming coordinates: %s - %s [peak = %s] [thresh = %s]" % (x[1], x[3], x[5], x[7]) )
+			self.setOutputValue("trimstart", x[1])
+			self.setOutputValue("trimend", x[3])
+		
+		#self.failed = True
+		
 
 class	AlignmentPlot(DefaultStep):
 	def __init__(self, ARGS, PREV):
@@ -1630,11 +1643,16 @@ class	AlignmentPlot(DefaultStep):
 		trimstart = self.getInputValue("trimstart")
 		if trimstart==None:
 			trimstart=0
+		elif trimstart=="find":
+			trimstart = self.find("trimstart")[0]
 			
 		trimend = self.getInputValue("trimend")
-		if trimend ==None:
+		if trimend == None:
 			trimend=0
+		elif trimend == "find":
+			trimend = self.find("trimend")[0]
 		
+		self.message("Adding trimmig marks at: %s - %s" % (trimstart, trimend))
 		tmp = open("%s/alsum.r" % (self.stepdir), "w")
 		tmp.write("source(\"%s/alignmentSummary.R\")\n" % (scriptspath))	
 		tmp.write("batch2(\"%s\", ref=\"%s\", trimstart=%s, trimend=%s )\n" % (f, ref, trimstart, trimend))
@@ -1937,13 +1955,15 @@ class	AlignmentTrim(DefaultStep):
 		self.setInputs(INS)
 		self.setArguments(ARGS)
 		self.setPrevious(PREV)
-		self.setName("AlTrim")
+		self.setName("AlignmentTrim")
 		self.start()
 						
 	def	performStep(self):
 		f = self.find("fasta")[0]
 		args = ""					
 		for arg, val in self.arguments.items():
+			if val.startswith("find"):
+				val=self.find(val.split(":")[1])[0]
 			args = "%s -%s %s" % (args, arg, val) 
 		
 		k ="python %salignmentTrimmer.py %s -I %s" % (scriptspath, args, f)
@@ -2030,6 +2050,8 @@ def	init(id, e):
 	BOH = BufferedOutputHandler()
 	MOTHUR = MothurCommandInfo(path=mothurpath)
 	QS = TaskQueueStatus(update = 0.1, maxnodes=250)
+	
+	return (BOH)
 	
 def	revComp(string):
 	global transtab
