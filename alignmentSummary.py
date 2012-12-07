@@ -114,6 +114,22 @@ def	qsub(num):
 	p = Popen(shlex.split(command), stdout=PIPE)	
 	
 	print command
+	
+	
+	################################################
+	### Read in a file and return a list of lines
+	###
+def loadLines(x):
+	try:
+		fp = open(x, "rU")
+		cont=fp.readlines()
+		fp.close()
+		#print "%s line(s) loaded."  % (len(cont))
+	except:
+		cont=""
+		#print "%s cannot be opened, does it exist? " % ( x )	
+	return cont
+	
 #################################################
 ##		Arguments
 ##
@@ -121,6 +137,10 @@ parser = OptionParser()
 
 parser.add_option("-p", "--pattern", dest="pattern",
                   help="the first sequence name that starts with P will be used as a reference for coordinates", metavar="P")
+
+parser.add_option("-T", "--threshold", dest="threshold", type="float", default=0.01,
+                  help="when calculating the alignment trimming coordinates, the first coordinate with coverage #*max coverage will be reported[default: %default]", metavar="P")
+
 
 parser.add_option("-i", "--input", dest="infilename",
                   help="NAME of an input file (fasta format)", metavar="NAME")
@@ -167,6 +187,7 @@ if options.master:
 	primers = list()
 	otpt = open("all.found.alignedprimercoords", "w")
 	for head, seq in file:
+		
 		if head.startswith("%s" % (options.pattern)) and refhed == "":
 			refhed = head
 			refseq = seq
@@ -176,6 +197,7 @@ if options.master:
 			print "\t^--found %s!" % (head)
 			seq = seq.lower()
 			primerseq = seq.lower().replace("-", "").replace(".", "")
+			primers.append(primerseq)
 			letters =len(primerseq)
 			#### ....------ACTG-ACT-----......
  			####           S      E
@@ -186,7 +208,7 @@ if options.master:
 			while letters > 0 and (start + counter) < len(seq) and seq[start+counter] != "." :
 				k = seq[start + counter]
 				
-				print k, start, counter
+				#print k, start, counter
 				if k in ['a', 'c', 'g', 't']:	
 					letters = letters - 1	
 				counter +=1
@@ -269,11 +291,50 @@ if options.master:
 		time.sleep(5)	
 			
 	#### output results
+	peak = 0
 	otpt = open(options.outfilename, "w")
 	for index, val in enumerate(c1):
 		line = "%s\t%s\t%s\n" % (c1[index], c2[index], c3[index])
+		if int(c3[index]) > peak:
+			peak = c3[index]
 		otpt.write(line)	
 	otpt.close()
+	
+	
+	#######################################
+	### open alsum
+	lines = loadLines(options.outfilename)
+	thresh = options.threshold * peak
+	
+	coord1 = 0;
+	coord2 = 0;
+	for line in lines:
+		c1, c2, val = line.strip().split()
+		val=int(val)-3
+		if val>thresh:
+			coord1 = int(c1)
+			break
+	
+	lines.reverse()
+	for line in lines:
+		c1, c2, val = line.strip().split()
+		val=int(val)-3
+		if val>thresh:
+			coord2 = int(c1)
+			break
+	adjustment = 0
+	#for p in primers:
+	#	if len(p)>adjustment:
+	#		adjustment = len(p)
+	
+	print primers	
+	print "start\t%s\tend\t%s\tpeak\t%s\tthresh\t%.3f" % (coord1, coord2, peak, thresh)
+	
+	
+	
+	
+	#######################################
+	
 else:
 
 	file = FastaParser(options.infilename)
