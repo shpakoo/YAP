@@ -29,7 +29,11 @@ _version="Version 1"
 def	cleanup(recordlist, start, end):
 	otpt=list()
 	for rec in recordlist:
-		seq = str(rec.seq)[start:end]
+		# we want to keep first and last base as reported
+		# upon examination of the alignment the start coordinate needs to be adjusted.
+		# alignment summary reports starting with 1, string coordinates are 0 based
+	
+		seq = str(rec.seq)[start-1:end]
 		tmp = SeqRecord(seq=Seq(seq), id=rec.id, name=rec.id, description=rec.id)
 		otpt.append(tmp)
 	return (otpt)
