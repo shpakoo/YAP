@@ -8,15 +8,15 @@
 ##    A pipeline for cleaning up sff files and producing 
 ##    OTUs (certain regions of 16S and ITS supported)
 #################################################
-import sys
+import sys, os.path
 from optparse import OptionParser, OptionGroup
 from StepsLibrary import *
 from collections import defaultdict
 from Queue import Queue
 
 _author="Sebastian Szpakowski"
-_date="2012/10/01"
-_version="Version 3"
+_date="2012/12/06"
+_version="Version 4"
 
 #################################################
 ##        Classes
@@ -25,8 +25,8 @@ _version="Version 3"
     ### Iterator over input file.
     ### every line is converted into a dictionary with variables referred to by their 
     ### header name
-class     GeneralPurposeParser:
-    def    __init__(self, file, skip=0, sep="\t"):
+class GeneralPurposeParser:
+    def __init__(self, file, skip=0, sep="\t"):
         self.filename = file
         self.fp = open(self.filename, "rU")    
         self.sep = sep
@@ -34,10 +34,10 @@ class     GeneralPurposeParser:
         self.linecounter = 0
         self.currline=""
         
-    def    __iter__(self):
+    def __iter__(self):
         return (self)
     
-    def    next(self):
+    def next(self):
         otpt = dict()
         for currline in self.fp:
             currline = currline.strip().split(self.sep)
@@ -46,11 +46,126 @@ class     GeneralPurposeParser:
             return(currline)            
         raise StopIteration
                     
-    def    __str__(self):
+    def __str__(self):
         return "%s [%s]\n\t%s" % (self.filename, self.linecounter, self.currline)
 
-class    InfoParser:
-    def    __init__(self, filename):
+class InfoValidator:
+    def __init__(self,filename):
+        self.filename = filename
+        self.info = GeneralPurposeParser(filename, sep=",")
+        self.URI = "http://confluence/display/~sszpakow/YAP"
+        self.epilogue = "\n***\tPlease correct before continuing...\n***\t{0}\n".format(self.URI) 
+        self.header = ""
+        
+        self.files,  self.barcodes ,self.primersF, self.primersR, self.sampleIDs = self.parse()
+        print ("***\tValidation complete, no obvious errors found.\n")
+       
+        
+        
+    def parse(self):
+        counter=0;
+        print ("\n***\tValidating your template\n\t{0} ...\n".format(self.filename))
+        files = set()
+        barcodes = set()
+        primersF = set()
+        primersR = set()
+        sampleIDs = set()
+                
+        for line in self.info:
+            if counter == 0:
+                
+                self.header = line
+                has =  ",".join (self.header[:8])
+                needed = "path,file,barcode,forward,reverse,use,both,SampleID"
+                if not has.lower() == needed.lower():
+                    self.error( "Your template's header is incorrect or missing:\nhas :\t{0}\nneed:\t{1}".format(has, needed), 101)
+                if not self.header[7] == "SampleID":    
+                    self.error( "Your template has\n\t'{0}' instead of \n\t'SampleID' as 8th column's header.".format(self.header[7]), 102)
+                    
+            else:
+                files.add("{0}/{1}".format(line[0], line[1]))   
+                barcodes.add(line[2])   
+                primersF.add(line[3])    
+                primersR.add(line[4])
+                sampleIDs.add(line[7])
+            counter+=1 
+            
+        ##### files
+        for f in files:
+            if not os.path.isfile(f):
+                self.error("file doesn't exist\n\t{0}".format(f), 103)
+
+        ##### F primers
+        if len(primersF)>1:
+            self.error("Multiple forward primers specified:\n\t{0}\n\tnot supported in the current version of YAP".format("\n\t".join(primersF)), 104)
+        
+        if list(primersF)[0].strip() =="" :
+            self.error("Forward primer should not be empty", 104)
+        
+        
+        ##### R primers
+        if len(primersF)>1:
+            self.error("Multiple reverse primers specified:\n\t{0}\n\tnot supported in the current version of YAP".format("\n\t".join(primersR)), 105)
+        
+        if list(primersR)[0].strip() =="" :
+            self.error("Reverse primer should not be empty", 105)
+        
+        ##### sampleIDs
+        spaces = set()
+        ill = ("\\","/", "~", "-", "+", "#")
+        illegalchars = set()
+        digitstart = set()
+        for s in sampleIDs:
+            if s.count(" ")>0:
+                spaces.add(s)
+            for k in ill:
+                if s.count(k)>0:
+                    illegalchars.add(s)
+            if s[0].isdigit():
+                digitstart.add(s)
+         
+        hint = "*You could create two columns: \n\tSampleID, compliant with YAP (excel function: SUBSTITUTE()) and\n\tOriginalIDs, where any character is allowed."    
+        if len(spaces)>0:
+            M = "The following samplesID(s) have spaces in them:\n\t"
+            for s in spaces:
+                M = "{0}'{1}',".format(M, s) 
+            M = "{0}\n\n\t{1}".format(M, hint)    
+            self.error(M, 106)    
+            
+        if len(illegalchars)>0:
+            M = "The following samplesID(s) have illegal chars in them {0}:\n\t".format(", ".join(ill))
+            for s in illegalchars:
+                M = "{0}'{1}',".format(M, s) 
+            
+            M = "{0}\n\n\t{1}".format(M, hint)    
+            self.error(M, 107)   
+            
+        if len(digitstart)>0:
+            M = "The following samplesID(s) start with numbers:\n\t".format(", ".join(ill))
+            for s in digitstart:
+                M = "{0}'{1}',".format(M, s) 
+                 
+            M = "{0}\n\n\t{1}".format(M, hint)    
+            self.error(M, 108)  
+            
+            
+        return (files, barcodes, primersF, primersR, sampleIDs)    
+                       
+                  
+    def error(self, message, code):
+        print "!!!\t{0}\n{1}".format(message, self.epilogue)
+        sys.exit(code)
+        
+    def getTrimpoints(self):
+        primers = self.primersF.union(self.primersR)
+        if "AGAGTTTGATYMTGGCTCAG" in primers and "ATTACCGCGGCTGCTGG" in primers:
+            return "1044", "13127", "1044-13127"
+        else:
+            return "0", "0", "unknown"
+
+       
+class InfoParser:
+    def __init__(self, filename):
         self.filename = filename
         self.info = GeneralPurposeParser(filename, sep=",")
         self.store = defaultdict(list)
@@ -62,7 +177,7 @@ class    InfoParser:
             
         self.primers = set()    
     
-    def    makeOligoFile(self, x):
+    def makeOligoFile(self, x):
         tmp=defaultdict(list)
         ### group barcodes and primers
         for line in self.store[x]:
@@ -75,7 +190,7 @@ class    InfoParser:
             
             if reverse =="" or forward =="":
                 print "%s: please provide both primers for barcode:'%s' " % (x, barcode)
-                sys.exit(1) 
+                sys.exit(11) 
             else:    
                 self.primers.add(">_primer_F\n%s\n" % (forward))
                 self.primers.add(">_primer_F_rc\n%s\n" % (revComp(forward)))
@@ -85,7 +200,7 @@ class    InfoParser:
             if needTwoPrimers in ("Yes", "yes", "Y", "YES"):
                 if forward == "" or reverse =="":
                     print "%s: two primers needed, only one supplied F:'%s'-R:'%s' %s\n check %s " % (x, forward, reverse, self.name)
-                    sys.exit(2)
+                    sys.exit(12)
                 bin = "B-%s-%s" % (forward, reverse)
                 tmp[bin].append((barcode, sampleID))
             else:
@@ -95,14 +210,14 @@ class    InfoParser:
                     tmp[bin].append((barcode, sampleID))
                 elif forward == "" and "F" in use:
                     print "%s: demultiplexing using forward primer requested but primer sequence not specified" % (x)
-                    sys.exit(3)     
+                    sys.exit(13)     
                 
                 if reverse != "" and "R" in use:
                     bin ="R-%s" % (reverse)
                     tmp[bin].append((barcode, sampleID))
                 elif reverse == "" and "R" in use:
                     print "%s: demultiplexing using reverse primer requested but primer sequence not specified" % (x)
-                    sys.exit(4)
+                    sys.exit(14)
                            
         oligofiles=list() 
          
@@ -151,7 +266,7 @@ class    InfoParser:
             print "The annotation file has more than 2 primers !"
             for p in self.primers:
                 print "%s" % (p.strip())
-            sys.exit(5)
+            sys.exit(15)
         
         primerfile = open(primerfilename , "w")     
         
@@ -168,7 +283,7 @@ class    InfoParser:
     ################################################
     ### Read in a file and return a list of lines
     ###
-def    loadLines(x):
+def loadLines(x):
     try:
         fp = open(x, "rU")
         cont=fp.readlines()
@@ -179,13 +294,13 @@ def    loadLines(x):
         #print "%s cannot be opened, does it exist? " % ( x )    
     return cont
 
-def    getOligoFlip(filename):
+def getOligoFlip(filename):
     if filename.find(".R.")>-1:
         return "T"
     else:
         return "F"
     
-def    demultiplex():
+def demultiplex():
     forprocessing = InfoParser(options.fn_info)
     DEMUX = list()
     
@@ -276,7 +391,7 @@ def    demultiplex():
     
     return ([A4, forprocessing.getPrimerFilename()])
 
-def    finalize(input):
+def finalize(input):
     clean = CleanFasta(dict(), [input])
     
     ####### remove sequences that are too short, and with ambiguous bases 
@@ -331,17 +446,28 @@ def    finalize(input):
      
     CD_4 = MothurStep("align.seqs", options.nodesize, inputs, args, [CD_3])
     
-    #### plots (inconsequential) 
-    args = {"ref": _referenceseqname}
+    #### AlignmentSummary determining alignment trimming options 
+    #### sets trimstart and trimend variables that can be used by in subsequent steps.
+    #### threshold means to keep the center part of the alignment with at least 
+    #### the fraction of maximum coverage  
+    args = {"ref": _referenceseqname, "thresh": options.dynthresh}
     CD_5 = AlignmentSummary(args,[CD_4])
     
-    args = {"ref": _referenceseqname, 
-            "trimstart" : _trimstart,  
-            "trimend" : _trimend
-            }
+    #### alignment plots  
+    if _trimstart != _trimend:
+        args = {"ref": _referenceseqname, 
+                "trimstart" : _trimstart,  
+                "trimend" : _trimend
+                }
+    else:  
+        args = {"ref": _referenceseqname, 
+                "trimstart" : "find",  
+                "trimend" : "find"
+                }        
     CD_6 = AlignmentPlot(args,[CD_5])
     
 
+    #supplementary.append(CD_5)
     supplementary.append(CD_6)
     ###########################
     
@@ -350,7 +476,7 @@ def    finalize(input):
     CD_4a = GroupRetriever(args, [CD_4])
     OutputStep("4-ALIGNED", "groupstats,tre,fasta,group,name,list,svg,pdf,tiff,taxsummary,globalsummary,localsummary", CD_4a)    
        
-    cleanCD = cleanup(CD_4)
+    cleanCD = cleanup(CD_5)
     args = {"mingroupmembers": 0, 
             "report": "passing"}
     cleanCDa = GroupRetriever(args, [cleanCD])
@@ -366,7 +492,7 @@ def    finalize(input):
         
     return (output2)
 
-def    cleanup(input):
+def cleanup(input):
 
     ### remove the "ref" group
     args = {
@@ -394,27 +520,33 @@ def    cleanup(input):
         A = MothurStep("chimera.%s" % (ch),options.nodesize, inputs, args, [s16])    
         toremove.append(A)
         
-        ### chimeras against self
-        args ={"force": "name,group,fasta"}
-        inputs = {}
-        
-        A = MothurStep("chimera.%s" % (ch),options.nodesize, inputs, args, [s16])    
-        toremove.append(A)
+        if not options.quickmode:
+            ### chimeras against self
+            args ={"force": "name,group,fasta"}
+            inputs = {}
+            
+            A = MothurStep("chimera.%s" % (ch),options.nodesize, inputs, args, [s16])    
+            toremove.append(A)
         
     ### merge all accnos files and remove ALL chimeras    
     allchimeras = FileMerger("accnos", toremove)
     s17 = MothurStep("remove.seqs",options.nodesize, dict(), dict(), allchimeras)
     
-    #### if primer trimming points are unknown
+    #### if primer trimming points are not unknown
     if _trimstart!=_trimend:
         ### primer cut
         args = {
                     "s" : _trimstart, 
                     "e": _trimend,
                 }
-        s18a = AlignmentTrim(dict(), args, s17)
     else:
-        s18a = s17
+        args = {
+                "s" : "find:trimstart",  
+                "e" : "find:trimend"
+        }
+     
+        
+    s18a = AlignmentTrim(dict(), args, [s17])
             
     ####### remove sequence fragments, bad alignments (?) 
     args = { "minlength" : "%s" % (options.minlength),
@@ -443,7 +575,7 @@ def    cleanup(input):
     
     return (s21)
 
-def    CDHITCluster(input):
+def CDHITCluster(input):
     cdhits = list()
     for arg in ["0.99", "0.97", "0.95", "0.90"]:
         args = {"c": arg,
@@ -472,7 +604,7 @@ def    CDHITCluster(input):
     SORTED = FileSort("list,rabund,sabund", READY)
     return (SORTED)
 
-def    plotsAndStats(input):
+def plotsAndStats(input):
     
     ### all groups!
     args = {"mingroupmembers": 0, 
@@ -556,6 +688,12 @@ group = OptionGroup(parser, "Optional Configuration", description="parameters to
 group.add_option("-Y", "--Yap", dest="mode", default="16S",
                  help="""Which Pipeline: 16S ITS [%default]""", metavar="#") 
 
+group.add_option("-D", "--dynamic", dest="dynamic", action = "store_true", default=False,
+                 help="""If specified, alignment will be scanned for primer locations and trimmed accordingly. Otherwise a database of known primers and trimming points will be used. [%default]""", metavar="#") 
+
+group.add_option("-d", "--thresh", dest="dynthresh", default=0.1, type="float",
+                 help="""in conjunction with -D, otherwise this is ignored. This allows to specify how much of the alignment to keep using the per-base coverage. The [%default] value indicates that ends of the alignment are trimmed until a base has a coverage of [%default] * peak coverage.""", metavar="#") 
+
 group.add_option("-a", "--annotations", dest="dir_anno", default="/usr/local/devel/ANNOTATION/sszpakow/ANNOTATION/",
                  help="directory that stores auxilliary files\n[%default]", metavar="annotations")
 group.add_option("-S", "--SAMPLE", dest="sampletimes", default=0, type="int",
@@ -565,7 +703,10 @@ group.add_option("-m", "--minlen", dest="minlength", default=220, type="int",
 
 group.add_option("-g", "--mingroupsize", dest="mingroupmembers", default=100, type="int",
                  help="after demultiplexing, discard groups with fewer reads than #\n[%default]", metavar="#")
-            
+    
+group.add_option("-q", "--quick", dest="quickmode", action = "store_true", default=False,
+                 help="""If specified, only single, reference DB based chimera checking will be used. [%default]""", metavar="#") 
+              
 group.add_option("-x", "--strict", dest="strictlevel", default=2, type="int",
                  help="""how strict to be at demultiplexing: 
 1 very strict (barcode no mismatches, primer no mismatches) 
@@ -594,6 +735,8 @@ parser.add_option_group(group)
 if options.fn_info == "" or options.email == "" or options.project =="":
     parser.print_help()
     sys.exit(1)
+  
+   
     
 if not options.mode in ("16S", "ITS"):
     parser.print_help()
@@ -614,8 +757,8 @@ if options.mode=="16S":
     _taxonomy = "trainset9_032012.pds.tax"
     ### until automatic primer detection is implemented, these are coordinates of primers
     ### when aligned to the silva.bacteria.fasta (for in-silico PCR and subsequent primer trimming)
-    _trimstart = "1044"
-    _trimend = "13127"
+    #_trimstart = "1044"
+    #_trimend = "13127"
     
 ### ITS NSI1 - NLB4 (barcoded)   
 elif options.mode=="ITS":
@@ -624,37 +767,45 @@ elif options.mode=="ITS":
     _alignment = "FungalITSseed.092012.1.aln.fasta"
     _trainset = "FungalITSdb.092012.1.fasta"
     _taxonomy = "FungalITSdb.092012.1.tax"
-    _trimstart = "1716"
-    _trimend = "2795"    
+    #_trimstart = "1716"
+    #_trimend = "2795"    
 
 else:
     parser.print_help()
     sys.exit(2)
-                                                
-init(options.project, options.email)
+                   
+validator = InfoValidator(options.fn_info)  
+_trimstart , _trimend, _region = validator.getTrimpoints()    
+                                                              
+BOH = init(options.project, options.email)
+BOH.toPrint("-----", "GLOBAL",  "We are in %s mode" % (options.mode)) 
 
-print "We are in %s mode" % (options.mode) 
+if options.dynamic or _region == "unknown":
+    BOH.toPrint("-----", "GLOBAL",  "experimental dynamic alignment trimming enabled")
+    BOH.toPrint("-----", "GLOBAL",  "alignment will be trimmed using %s * peak coverage threshold" % (options.dynthresh))
+    _trimstart = "0"
+    _trimend = "0"
+else:
+    BOH.toPrint("-----", "GLOBAL",  "alignment trimming predefined: %s - %s" % (_trimstart, _trimend))
 
-############################
-######################
-#### reference: 
+
+#############################
+#######################
+##### reference: 
 inputs = {"fasta": ["%s/%s" % (options.dir_anno, _referenceseq)] }
 REF = FileImport(inputs)
 REF_1 = MakeNamesFile([REF])
 REF_2 = MakeGroupsFile([REF], "ref")
 REF_3 = MakeQualFile  ([REF], "40" )
-#############################
-
+##############################
+#
 supplementary = list()
 READY, primerfile = demultiplex()
 
-print primerfile
-
-######################
-#### primers: 
+#######################
+##### primers: 
 inputs = {"fasta": ["%s/%s" % (os.getcwd(), primerfile)] }
 PRI = FileImport(inputs)
-
 PRI_1 = MakeNamesFile([PRI])
 PRI_2 = MakeGroupsFile([PRI], "ref")
 PRI_3 = MakeQualFile([PRI], "40")
@@ -690,8 +841,8 @@ else:
 OutputStep("7-SUPP_PLOTS", "tre,pdf,svg,tiff,r_nseqs,rarefaction,r_simpson,r_invsimpson,r_chao,r_shannon,r_shannoneven,r_coverage", supplementary)
     
     
-##########################################################################    
-#  
-#################################################
-##        Finish
-#################################################
+###########################################################################    
+##  
+##################################################
+###        Finish
+##################################################
