@@ -360,9 +360,23 @@ makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0)
 		text(coords[2], ylim[2], paste(coords[1], "-", coords[2],"\n" , info, sep=""), cex=0.5, pos=4)
 		abline(v=coords[2], lty=3, col="red", lwd=1)
 		
+		### 357F
+		coords = c(341, 357)
+		info = "357F"
+		lines(coords, rep(ylim[2],2), lwd=5, col="red" )
+		text(coords[2], ylim[2], paste(coords[1], "-", coords[2],"\n" , info, sep=""), cex=0.5, pos=4)
+		abline(v=coords[2], lty=3, col="red", lwd=1)
+		
 		### 534R
 		coords = c(518, 534)
 		info = "534R"
+		lines(coords, rep(ylim[2],2), lwd=5, col="red" )
+		text(coords[1], ylim[2], paste(coords[1], "-", coords[2],"\n" , info, sep=""), cex=0.5, pos=2)
+		abline(v=coords[1], lty=3, col="red", lwd=1)
+		
+		### 926R
+		coords = c(926-18, 926)
+		info = "926R"
 		lines(coords, rep(ylim[2],2), lwd=5, col="red" )
 		text(coords[1], ylim[2], paste(coords[1], "-", coords[2],"\n" , info, sep=""), cex=0.5, pos=2)
 		abline(v=coords[1], lty=3, col="red", lwd=1)
@@ -389,18 +403,18 @@ makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0)
 	if (trimstart!=0)
 	{
 		print (xs[labs==trimstart])
-		abline(v=xs[labs==trimstart], col="gray80", lwd=2, lty=3)
+		abline(v=xs[labs==trimstart], col="gray80", lwd=3, lty=3)
 		
 	}
 	if (trimend !=0)
 	{
 		print (xs[labs==trimend])
-		abline(v= xs[labs==trimend], col="gray80", lwd=2, lty=3)
+		abline(v= xs[labs==trimend], col="gray80", lwd=3, lty=3)
 	}
 	
 	box()
 	
-	if (ref=="16S")
+	if (ref=="e_coli2_genbank")
 	{
 		legend ("right", 
 			c("read counts", "trendline", "primer locations", "\"V\" regions", "REFERENCE coordinates", "SILVA coordinates"),
