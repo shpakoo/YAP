@@ -138,7 +138,7 @@ parser = OptionParser()
 parser.add_option("-p", "--pattern", dest="pattern",
                   help="the first sequence name that starts with P will be used as a reference for coordinates", metavar="P")
 
-parser.add_option("-T", "--threshold", dest="threshold", type="float", default=0.01,
+parser.add_option("-T", "--threshold", dest="threshold", type="float", default=0.1,
                   help="when calculating the alignment trimming coordinates, the first coordinate with coverage #*max coverage will be reported[default: %default]", metavar="P")
 
 

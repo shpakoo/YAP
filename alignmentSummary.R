@@ -270,7 +270,7 @@ batch=function(inputfile, description, pattern="e_coli", cpus = 16)
 }
 
 
-makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0)
+makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0, thresh=0)
 {
 
 	labs = input$global
@@ -403,13 +403,19 @@ makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0)
 	if (trimstart!=0)
 	{
 		print (xs[labs==trimstart])
-		abline(v=xs[labs==trimstart], col="gray80", lwd=3, lty=3)
+		abline(v=xs[labs==trimstart], col="gray60", lwd=3, lty=3)
 		
 	}
 	if (trimend !=0)
 	{
 		print (xs[labs==trimend])
-		abline(v= xs[labs==trimend], col="gray80", lwd=3, lty=3)
+		abline(v= xs[labs==trimend], col="gray60", lwd=3, lty=3)
+	}
+	
+	if (thresh!=0)
+	{
+		print (
+		abline(v = thresh, col="gray60", lwd=1, lty=3)
 	}
 	
 	box()
@@ -417,26 +423,26 @@ makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0)
 	if (ref=="e_coli2_genbank")
 	{
 		legend ("right", 
-			c("read counts", "trendline", "primer locations", "\"V\" regions", "REFERENCE coordinates", "SILVA coordinates"),
-			fill=c("yellowgreen", "gray50", "red", "gray80", "blue", "lightblue"), 	
+			c("read counts", "trendline", "primer locations", "\"V\" regions", "REFERENCE coordinates", "SILVA coordinates", "trim points"),
+			fill=c("yellowgreen", "gray50", "red", "gray80", "blue", "lightblue", "gray60"), 	
 			ncol=1, cex=0.75, bg="ivory")
 	}
 	else
 	{
 		legend ("right", 
-				c("read counts", "trendline", "REFERENCE coordinates", "ALIGNMENT coordinates"),
-				fill=c("yellowgreen", "gray50", "blue", "lightblue"), 	
+				c("read counts", "trendline", "REFERENCE coordinates", "ALIGNMENT coordinates", "trim points"),
+				fill=c("yellowgreen", "gray50", "blue", "lightblue", "gray60"), 	
 				ncol=1, cex=0.75, bg="ivory")
 	}
 	
 }
 
-batch2 = function(inputfile, ref="e_coli2_genbank", trimstart=0, trimend=0)
+batch2 = function(inputfile, ref="e_coli2_genbank", trimstart=0, trimend=0, thresh=0)
 {
 	input = read.table(inputfile, as.is=TRUE, header=FALSE)
 	names(input) <- c("global", "local", "val")
 	pdf(paste(inputfile,".pdf", sep=""), width=15, height=6)
-	makeAlignmentHistogram2(input, ref, trimstart, trimend)
+	makeAlignmentHistogram2(input, ref, trimstart, trimend, thresh)
 	dev.off()
 }
 
