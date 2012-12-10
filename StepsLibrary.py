@@ -533,6 +533,7 @@ class GridTask():
 			self.queue = QS.pickQ()
 		self.command = self.templates[self.queue]
 		
+		#print self.command
 		p = Popen(shlex.split(self.command), stdout=PIPE, stderr=PIPE, cwd=self.cwd, close_fds=True)
 		
 		p.wait()
@@ -1606,7 +1607,7 @@ class 	AlignmentSummary(DefaultStep):
 			
 		th =  self.getInputValue("thresh")
 		if th == None:
-			th="0.01"	
+			th="0.1"	
 			
 		self.message("summarizing an alignment in %s" % (f) )
 		k = "python %s/alignmentSummary.py -P %s -M %s -t 500 -p %s -i %s -o %s.alsum -T %s" % (scriptspath, self.project, self.mailaddress, ref, f,f, th)
@@ -1619,6 +1620,7 @@ class 	AlignmentSummary(DefaultStep):
 			self.message("Potential trimming coordinates: %s - %s [peak = %s] [thresh = %s]" % (x[1], x[3], x[5], x[7]) )
 			self.setOutputValue("trimstart", x[1])
 			self.setOutputValue("trimend", x[3])
+			self.setOutputValue("trimthresh", x[7])
 		
 		#self.failed = True
 		
@@ -1651,11 +1653,18 @@ class	AlignmentPlot(DefaultStep):
 			trimend=0
 		elif trimend == "find":
 			trimend = self.find("trimend")[0]
+			
+		trimthresh = self.getInputValue("trimthresh")
+		if trimthresh == None:
+			trimthresh=0
+		elif trimthresh == "find":
+			trimthresh = self.find("trimthresh")[0]	
+			
 		
 		self.message("Adding trimmig marks at: %s - %s" % (trimstart, trimend))
 		tmp = open("%s/alsum.r" % (self.stepdir), "w")
 		tmp.write("source(\"%s/alignmentSummary.R\")\n" % (scriptspath))	
-		tmp.write("batch2(\"%s\", ref=\"%s\", trimstart=%s, trimend=%s )\n" % (f, ref, trimstart, trimend))
+		tmp.write("batch2(\"%s\", ref=\"%s\", trimstart=%s, trimend=%s, thresh=%s )\n" % (f, ref, trimstart, trimend, trimthresh))
 		tmp.close()
 		k = "R CMD BATCH alsum.r"
 		task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
