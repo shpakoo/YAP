@@ -21,34 +21,7 @@ _version="Version 4"
 #################################################
 ##        Classes
 ##
-    #################################################
-    ### Iterator over input file.
-    ### every line is converted into a dictionary with variables referred to by their 
-    ### header name
-class GeneralPurposeParser:
-    def __init__(self, file, skip=0, sep="\t"):
-        self.filename = file
-        self.fp = open(self.filename, "rU")    
-        self.sep = sep
-        
-        self.linecounter = 0
-        self.currline=""
-        
-    def __iter__(self):
-        return (self)
-    
-    def next(self):
-        otpt = dict()
-        for currline in self.fp:
-            currline = currline.strip().split(self.sep)
-            self.currline = currline
-            self.linecounter = self.linecounter + 1
-            return(currline)            
-        raise StopIteration
-                    
-    def __str__(self):
-        return "%s [%s]\n\t%s" % (self.filename, self.linecounter, self.currline)
-
+ 
 class InfoValidator:
     def __init__(self,filename):
         self.filename = filename
@@ -60,8 +33,7 @@ class InfoValidator:
         self.files,  self.barcodes ,self.primersF, self.primersR, self.sampleIDs = self.parse()
         print ("***\tValidation complete, no obvious errors found.\n")
        
-        
-        
+               
     def parse(self):
         counter=0;
         print ("\n***\tValidating your template\n\t{0} ...\n".format(self.filename))
@@ -280,19 +252,6 @@ class InfoParser:
 #################################################
 ##        Functions
 ##
-    ################################################
-    ### Read in a file and return a list of lines
-    ###
-def loadLines(x):
-    try:
-        fp = open(x, "rU")
-        cont=fp.readlines()
-        fp.close()
-        #print "%s line(s) loaded."  % (len(cont))
-    except:
-        cont=""
-        #print "%s cannot be opened, does it exist? " % ( x )    
-    return cont
 
 def getOligoFlip(filename):
     if filename.find(".R.")>-1:

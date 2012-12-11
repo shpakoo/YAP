@@ -266,7 +266,6 @@ class	BufferedOutputHandler(Thread):
 			curses.resetty()
 			curses.endwin()
 			
-
 class   TaskQueueStatus(Thread):
 	def __init__(self, update=1, maxnodes=10):
 		Thread.__init__(self)
@@ -380,7 +379,7 @@ class   TaskQueueStatus(Thread):
 		out,err = p.communicate()
 		
 		if err.find("neither submit nor admin host")==-1:
-			queues = dict()
+			queues = defaultdict(float)
 			out = out.strip().split("\n")
 			for q in out[2:]:
 				queue, cqload, used, res, avail, total, acds, cdsu = q.split()
@@ -627,7 +626,33 @@ class	FastaParser:
 	def	__str__():
 		return ("reading file: %s" %self.filename)	
 
-
+	#################################################
+	### Iterator over input file.
+	### every line is converted into a dictionary with variables referred to by their 
+	### header name
+class GeneralPurposeParser:
+	def	__init__(self, file, skip=0, sep="\t"):
+		self.filename = file
+		self.fp = open(self.filename, "rU")	
+		self.sep = sep
+		
+		self.linecounter = 0
+		self.currline=""
+		
+	def __iter__(self):
+		return (self)
+	
+	def next(self):
+		otpt = dict()
+		for currline in self.fp:
+			currline = currline.strip().split(self.sep)
+			self.currline = currline
+			self.linecounter = self.linecounter + 1
+			return(currline)			
+		raise StopIteration
+					
+	def	__str__(self):
+		return "%s [%s]\n\t%s" % (self.filename, self.linecounter, self.currline)
 
 	#################################################
 	### The mother of all Steps:
@@ -1431,12 +1456,12 @@ class	FileMerger(DefaultStep):
 		for t in self.getInputValue("types").strip().split(","):
 			files = self.find(t)
 			if len(files)>0 and len(files)<25:
-				k = "cat %s > %s_x%s.merged.%s" % (" ".join(files), self.prefix, len(files), t)
+				k = "cat %s > %s.x%s.merged.%s" % (" ".join(files), self.prefix, len(files), t)
 				self.message(k)	
 				task = GridTask(template="pick", name="cat", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 			elif len(files)>=25:
-				k = "cat *.%s* > %s_x%s.merged.%s" % (t, self.prefix, len(files), t)
+				k = "cat *.%s* > %s.x%s.merged.%s" % (t, self.prefix, len(files), t)
 				self.message(k)	
 				task = GridTask(template="pick", name="cat", command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
