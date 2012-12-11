@@ -414,7 +414,7 @@ makeAlignmentHistogram2=function(input, ref, trimstart=0, trimend=0, thresh=0)
 	
 	if (thresh!=0)
 	{
-		print (
+
 		abline(v = thresh, col="gray60", lwd=1, lty=3)
 	}
 	

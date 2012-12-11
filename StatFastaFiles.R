@@ -237,7 +237,7 @@ makeGGplot=function(fastafiles, fastas=list(), main=fastafile, prefix="",...)
 	
 	
 	#pdf("test.pdf", width=10, height = 15)
-	png("FastaFileStats_GG.png", width=10, height = 20, units="in", res=250)
+	png("FastaFileStats_GG.png", width=10, height = 30, units="in", res=250)
 	multiplot(A, B,  C1, C2,  F, ncol=1)
 	dev.off()
 	
