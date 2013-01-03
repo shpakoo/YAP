@@ -367,7 +367,7 @@ makeGGplotCOVERAGE = function(global)
 #				)
 	
 	
-	png("AllAssemblyStats_GG.png", width=20, height = 12, units="in", res=250)
+	png("AllAssemblyStats_GG.png", width=20, height = 20, units="in", res=250)
 	multiplot(plotlist=plots, cols=4)
 	dev.off()
 	invisible(plots)
