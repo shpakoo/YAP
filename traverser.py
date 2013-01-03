@@ -15,6 +15,7 @@
 import sys, glob
 from optparse import OptionParser
 from collections import defaultdict
+import re
 
 _author="Sebastian Szpakowski"
 _date="2011/01/01"
@@ -73,7 +74,7 @@ class	Node:
 								file = "%s (%s) %s" % (type, len(groups), file[5:]) 
 								
 							if len(file)>100:
-								file = "%s..." % file[:96]
+								file = "...%s" % file[-96:]
 								
 							self.outputs[type].add(file)	
 							self.outputids[file] = "<f%s>" % (counter)
@@ -104,7 +105,7 @@ class	Node:
 							file = file.split("/")[-1] 
 							
 						if len(file)>100:
-								file = "%s..." % file[:96]
+								file = "...%s" % file[-96:]
 							
 						self.inputs[type].add(file)	
 				else:
@@ -129,10 +130,19 @@ class	Node:
 						#print (file)
 						
 			elif line[0] == "argument":
+				
+				
 				if len(line)==2:
 					self.arguments[line[1]] = " "
+					
+				elif line[1] in ["postprocess", "awk"]:
+					val = re.escape(line[2].replace("-", "_"))					
+					#print "huh", val, line[2]
+					self.arguments[line[1]] = val
+					
 				else:
-					self.arguments[line[1]]=line[2]
+					self.arguments[line[1]] = line[2]	
+					
 				
 	def	getIns(self):
 		otpt = list()
@@ -157,13 +167,14 @@ class	Node:
 	def	getLabel(self):
 		otpt = "%s [%s]" % (self.label, self.workpathid)
 		for arg, val in self.arguments.items():
+						
 			tmp = list()
 			for v in val.split("-"):
 				for vv in v.split(","):
 					vv = vv.strip()
 					if len(vv)>0:
 						tmp.append(vv)
-		
+				
 			otpt = "%s\\n%s -\\> %s " % (otpt, arg, "\\n-\\> ".join(tmp))
 		return (otpt)
 	
