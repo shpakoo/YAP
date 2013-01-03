@@ -381,18 +381,37 @@ class   TaskQueueStatus(Thread):
 		if err.find("neither submit nor admin host")==-1:
 			queues = defaultdict(float)
 			out = out.strip().split("\n")
+			
+			fullqueues = set()
+			
+			#cache queue information
 			for q in out[2:]:
 				queue, cqload, used, res, avail, total, acds, cdsu = q.split()
 				avail = float(avail)
 				total = float(total)
 				if total>0:
 					queues[queue] = avail
+				
+				if avail==0:
+					fullqueues.add(queue)	
+			
+			
+			# determine which queue is the best
 			
 			#for k in ("default.q", "medium.q", "fast.q", "himem.q"):
-			for k in ("himem.q", "medium.q", "default.q"):
 			#for k in ("fast.q", "medium.q", "default.q"):
-				if queues[k] > queues[self.bestqueue]:
-					self.bestqueue= k
+			#for k in ("himem.q", "medium.q", "default.q"):
+								
+			if ("medium.q" in fullqueues) and ("default.q" in fullqueues):
+				if queues["himem.q"]>0:
+					self.bestqueue = "himem.q"
+				else:
+					self.bestqueue = "medium.q"
+			else:
+				for k in ("medium.q", "default.q"):
+					if queues[k] >= queues[self.bestqueue]:	
+						self.bestqueue = k			
+						
 			  
 ### sanity check, this should match the counters				
 	def pollrunning(self):
@@ -1095,6 +1114,7 @@ class	FileImport(DefaultStep):
 		for type in self.inputs.keys():
 			files = self.inputs[type]
 			for file in files:
+				pool_open_files.acquire()
 				file = file.split("~")
 				if len(file)>1:
 					file, newname = file
@@ -1110,6 +1130,7 @@ class	FileImport(DefaultStep):
 				self.message(k)
 				out,err = p.communicate()
 				p.wait()
+				pool_open_files.release()
 				
 class	ArgumentCheck(DefaultStep):
 	def	__init__(self, SHOW, PREV):
@@ -2107,7 +2128,7 @@ inttab=  "ACGTN"
 outtab = "TGCAN"
 transtab = maketrans(inttab, outtab)
 
-pool_open_files = BoundedSemaphore(value=10, verbose=False)
+pool_open_files = BoundedSemaphore(value=4, verbose=False)
 
 mothurpath  = "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/mothur-current/"
 cdhitpath 	= "/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/cdhit-current/"
