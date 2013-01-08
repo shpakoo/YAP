@@ -2090,7 +2090,7 @@ def	unlist(struct):
 		else:
 			yield x
 	
-def	init(id, e):
+def	init(id, e, maxnodes = 250, update=0.1):
 	global __projectid__
 	global __email__
 	global __admin__
@@ -2104,7 +2104,7 @@ def	init(id, e):
 	
 	BOH = BufferedOutputHandler()
 	MOTHUR = MothurCommandInfo(path=mothurpath)
-	QS = TaskQueueStatus(update = 0.1, maxnodes=250)
+	QS = TaskQueueStatus(update = update, maxnodes=maxnodes)
 	
 	return (BOH)
 	
