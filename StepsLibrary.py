@@ -1484,7 +1484,7 @@ class	FileMerger(DefaultStep):
 			elif len(files)>=25:
 				k = "cat *.%s* > %s.x%s.merged.%s" % (t, self.prefix, len(files), t)
 				self.message(k)	
-				task = GridTask(template="pick", name="cat", command=k, cpu=1,  cwd = self.stepdir)
+				task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 			#else:
 			#	self.failed=True
@@ -1511,7 +1511,7 @@ class	FileSort(DefaultStep):
 			if len(files)>0:
 				k = "sort -n %s > files_x%s.sorted.%s" % (" ".join(files), len(files), t)
 				self.message(k)	
-				task = GridTask(template="pick", name="sort", command=k, cpu=1,  cwd = self.stepdir)
+				task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 		for task in tasks:
 			task.wait()
@@ -1535,7 +1535,7 @@ class	FileType(DefaultStep):
 				outname = "%s.%s" % (file, output)
 				k = "cp %s %s" % (file, outname)
 				self.message(k)	
-				task = GridTask(template="pick", name="sort", command=k, cpu=1,  cwd = self.stepdir)
+				task = GridTask(template="pick", name=self.stepname, command=k, cpu=1,  cwd = self.stepdir)
 				tasks.append(task)
 		for task in tasks:
 			task.wait()
