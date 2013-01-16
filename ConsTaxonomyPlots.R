@@ -780,7 +780,10 @@ comparisonPlot = function(dataset, annotation, desc, column, columnb, funcname="
 	}	
 	
 	######## keep only the aggregated statistics
-	#print (ncol(tmp))
+	if (is.null(nrow(tmp)))
+	{
+		return (data.frame())
+	}
 	tokeep = (ncol(tmp)-nrow(x)+1):ncol(tmp)
 	if (length(tokeep)>1)
 	{
@@ -1269,7 +1272,7 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 							#curanno = annotation[annotation[,g] != "" & annotation[,h] != "", ]
 							curdata = x[,names(x) %in% c("label", "depth", "taxonid", curanno$SampleID),]
 							if (ncol(curdata)>3)
-							{				
+							{	
 								dataset = comparisonPlot(curdata, curanno, paste("taxon:", taxon), h, g, funcname="diff", topmost=15,  perc=FALSE, legendtitle = paste(h), ordervars = c())
 								
 								if (nrow(dataset)==0)

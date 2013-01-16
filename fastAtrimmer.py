@@ -21,7 +21,7 @@ _version="Version 1"
 ##		Classes
 ##
 	#################################################
-	### Iterator over input fata file.
+	### Iterator over input fasta file.
 	### Only reading when requested
 	### Useful for very large FASTA files
 	### with many sequences
