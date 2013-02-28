@@ -1,6 +1,11 @@
-#!/usr/bin/python
+########################################################################################
+## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
+## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+## Copyright (c) 2011-2013 Sebastian Szpakowski
+########################################################################################
+
 #################################################
-## 	A new program
+## 	filter mates to keep pairs
 #################################################
 import sys
 from optparse import OptionParser
@@ -64,12 +69,17 @@ parser.add_option("-i", "--input", dest="fn_input",
                   help="fastQ file name (or names, comma separated)", metavar="FILE")
 
 
-parser.add_option("-f", "--filter", dest="fn_filter",
+parser.add_option("-f", "--filter", dest="fn_filter",default = "",
                   help="list of names to remove", metavar="FILE")
-                  
 
+parser.add_option("-k", "--keep", dest="fn_keep",default = "",
+                  help="list of names to keep", metavar="FILE")
+           
 parser.add_option("-t", "--format", dest="file_format", default="fastq",
-                  help="list of names to remove", metavar="FILE")
+                  help="format of the input file", metavar="FILE")
+
+parser.add_option("-s", "--suffix", dest="suffix", default="filt",
+                  help="suffix to add right before output file extension", metavar="FILE")
 
 (options, args) = parser.parse_args()
 
@@ -77,28 +87,42 @@ parser.add_option("-t", "--format", dest="file_format", default="fastq",
 ##		Begin
 ##
 
-names = [x.strip().split()[0] for x in loadLines(options.fn_filter)]
-names = set(names)
+if options.fn_filter != "":
+	keep = False
+	names = [x.strip().split()[0].strip("@") for x in loadLines(options.fn_filter)]
+	names = set(names)
+	
+elif options.fn_keep != "":
+	keep = True
+	names = [x.strip().split()[0].strip("@") for x in loadLines(options.fn_keep)]
+	names = set(names)	
+
+else:
+	print "keep or filter required"
+	parser.print_help()
+	sys.exit(1)
 
 for file in options.fn_input.strip().split(","):
-	file_in = open(file, "r")
+	
 	
 	filename = file.strip().split("/")[-1]
 	ext = filename.split(".")[-1]
-	filename = "%s.filt.%s" % (".".join(filename.split(".")[:-1]), ext)
+	filename = "%s.%s.%s" % (".".join(filename.split(".")[:-1]), options.suffix, ext)
 	
-	outputs = list()
+	file_in = open(file, "r")
+	file_out = open(filename, "w")
 	
 	for record in SeqIO.parse(file_in, options.file_format) :
-		#print record.id
-		if record.id.split()[0] in names:
-			print "filtering out:", record.id
+		recid = record.id.split()[0].strip("@")
+		found = recid in names
+		if ( found and keep ) or ( not found and not keep ) :
+			#outputs.append(record)	
+			SeqIO.write([record], file_out, options.file_format)	
+			names.discard(recid)		
 		else:
-			outputs.append(record)
-					
-	file_in.close()
-	file_out = open(filename, "w")
-	SeqIO.write(outputs, file_out, options.file_format)	
+			print "filtering out:", record.id
+								
+	file_in.close()	
 	file_out.close()
 #################################################
 ##		Finish

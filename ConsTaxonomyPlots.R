@@ -1,7 +1,7 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 J.Craig Venter Institute.
+## Copyright (c) 2011-2013 Sebastian Szpakowski
 ########################################################################################
 
 library(fdrtool)
@@ -416,16 +416,16 @@ getPvals = function(x, mapping)
 	pval = NA
 	
 #	print ("...")
+#	print (x)
 #	print (mapping)
 #	print (tmp)
 #	print (as.numeric(map))
 #	print (sum(as.numeric(map)))
-#	print (sd(as.numeric(map)))
-	
+#	print (sd(as.numeric(map)))	
+
 	
 	if (length(tmp)>0 && !is.na(sum(as.numeric(map))) && sd(as.numeric(map))>0  )
 	{
-
 		pval = kruskal.test(tmp, as.numeric(map) )$p.value 
 		if (is.nan(pval))
 		{
@@ -483,14 +483,21 @@ profilePlot = function(dataset, annotation, desc, column, topmost=30, perc=TRUE,
 	}
 	
 	######### subset SampleIDs per group
-	x = aggregate(annotation[, c("SampleID")], list(annotation[,column]), function(x){ return(levels(x)[x]) } )
+	x = aggregate(annotation[, c("SampleID")], list(annotation[,column]), function(x){ return(list(levels(x)[x])) } )
 	
 	tmpsd=tmp
 	
 	################
 	#print ("...")
 	#print (x)
+
+	
+#	if (desc =="Taxon: level 3, samples grouped by: T1D")
+#	{
+#		save(tmp,x, annotation, column,  file = "tmp.Rdata")	
+#	}
 	pvals = apply(tmp[,names(tmp)%in% unlist(x[,2])], 1, getPvals, x[,2])
+
 	
 	
 	###############
@@ -1228,8 +1235,8 @@ makeDefaultBatchOfPlots=function(annotationfilename, constaxonomyfilename, filep
 			cat ("Profl.:")
 			filename = paste(fileprefix,"TAX", taxon, "PROFILE.pdf", sep=".")
 			filename2 = paste(fileprefix,"TAX", taxon, sep=".")
-			pdf (filename, paper="special", width=12, height=20)
-			par(mar=c(5,14,4,2))
+			pdf (filename, paper="special", width=12, height=12)
+			par(mar=c(5,35,4,2))
 			for (category in categories)
 			{
 				cat ("\t", category, sep="")

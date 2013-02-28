@@ -1,14 +1,11 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 J.Craig Venter Institute.
+## Copyright (c) 2011-2013 Sebastian Szpakowski
 ########################################################################################
 
-
-
-#!/usr/bin/python
 #################################################
-## 	A new program
+## 	Wrapper enabling incorporaiton of MOTHUR commands as modules in YAP
 #################################################
 import sys, tempfile, shlex, glob, os
 from subprocess import *
@@ -22,7 +19,6 @@ _version="Version 1"
 ##		Classes
 ##
 
-
 class	MothurCommand():
 	def	__init__(self):
 		self.name = ""
@@ -33,41 +29,40 @@ class	MothurCommand():
 		self.text = ""
 		self.linkbacks = defaultdict(list)
 				
-	def	addArg(self, arg, val):
+	def	addArg(self, type, arg, val):
+
 		self.text = "%s\n%s\t%s" % (self.text, arg[0:50].ljust(50), val[0:50].ljust(50)) 
+		
 		if arg == "commandName":
 			self.name = val
-		else:
-			self.determineType(arg, val)
-		
-	def	determineType(self, arg, val):
-		vals = val.split("|")
-		
-		if arg in ["citation", "description", "commandCategory", "help"]:
+		elif type == "":
 			self.annotation[arg]=(val)
 			
-		elif arg == "outputTypes":
-			for o in val.split("-"):
-				self.output_files[o]= ""
-				
+		elif type == "outputTypesNames" and type!=arg:
+			self.output_files[arg] = ""	
+			
 		elif arg == "inputTypes":	
 			for i in val.split("-"):
 				self.input_files[i]= ()
-					
-		elif len(vals)==3:
+		else:			
+			self.parseType(arg, val)
+				
+	def	parseType(self, arg, val):				
+				
+		vals = val.strip().split("|")			
+		if len(vals)==5:
 			vals[2] = self.booleanify(vals[2])
 			vals[0] = vals[0].strip().split("-")
 			self.args[arg] = vals
 			
 		elif arg in self.input_files.keys():
-			req, one, oneplus, linked = vals
+			req, imp, one, oneplus, linked, outs = vals
 			self.input_files[arg] = (req, one, oneplus, linked)	
 			
 			for K in one, oneplus, linked:
 				if K !="none":
 					for L in K.strip().split("-"):
-						self.linkbacks[L].append(arg) 
-							
+						self.linkbacks[L].append(arg) 							
 		else:	 
 			self.args[arg] = vals
 			#print self.name, ":", arg, "=", val
@@ -116,6 +111,7 @@ class	MothurCommand():
 		return (self.args[arg])	
 				
 	def	__str__(self):
+		print self.output_files
 		otpt = "%s:" % (self.name)
 		otpt = "%s\n%s\t%s" % (otpt, "input".rjust(10)  ,"".join([x.ljust(20) for x in self.input_files.keys()]))
 		otpt = "%s\n%s\t%s" % (otpt, "req".rjust(10)  ,"".join(["".join("%s" % self.isRequired(x))[:18].ljust(20) for x in self.input_files.keys()]))
@@ -160,20 +156,32 @@ class	MothurCommandInfo():
 	def parseInfo(self, info):
 		current = MothurCommand()
 		counter = 0 
+		curtype = ""		
+				
 		for line in info:
 			line = line.strip().split("=")
+			A = line[0]
 			
 			if len(line)>1:
-				if line[0]=="commandName":
+				B = "=".join(line[1:])
+				if B.isdigit() or A=="inputTypes":
+					curtype = A
+					
+				if A=="commandName":
 					self.addCommand(current)
-					current = MothurCommand()					
-				current.addArg(line[0], "=".join(line[1:]))					
+					current = MothurCommand()	
+					curtype = ""
+									
+				current.addArg(curtype, A, B)					
+			
 			else:
-				counter = int(line[0])
+				counter = int(A)
+				
 				
 			self.addCommand(current)	
 			
 		print 	"Identified %s commands [reported: %s]" % (len(self.commands.keys()), counter)
+	
 			
 	def	addCommand(self, K):
 		if K.name!="":
@@ -210,25 +218,25 @@ def	loadLines(x):
 		#print "%s cannot be opened, does it exist? " % ( x )	
 	return cont
 	
-def test():
-	M = MothurCommandInfo()
-	x = M.getCommandInfo("dist.seqs")
-	print x
-	
-	x = M.getCommandInfo("unique.seqs")
-	print x
-	
-	x = M.getCommandInfo("cluster")
-	print x
-	
-	x = M.getCommandInfo("trim.seqs")
-	print x
-	
+def test(path = "./"):
+	M = MothurCommandInfo(path)
+#	x = M.getCommandInfo("dist.seqs")
+#	print x
+#	
+#	x = M.getCommandInfo("unique.seqs")
+#	print x
+#	
+#	x = M.getCommandInfo("cluster")
+#	print x
+#	
+#	x = M.getCommandInfo("trim.seqs")
+#	print x
+#	
 	x = M.getCommandInfo("align.seqs")
 	print x
-	
-	x = M.getCommandInfo("remove.seqs")
-	print x
+#	
+#	x = M.getCommandInfo("remove.seqs")
+#	print x
 
 #################################################
 ##		Arguments
@@ -238,7 +246,7 @@ def test():
 ##		Begin
 ##
 
-#test()
+#test("/usr/local/devel/ANNOTATION/sszpakow/YAP/bin/mothur-v1.29.2/")
 #################################################
 ##		Finish
 #################################################

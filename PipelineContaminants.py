@@ -1,10 +1,16 @@
-#!/usr/bin/python
+########################################################################################
+## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
+## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+## Copyright (c) 2011-2013 Sebastian Szpakowski
+########################################################################################
+
 #################################################
-## 	A new program
+## 	Remove Contaminants
 #################################################
 import sys, os
 from optparse import OptionParser, OptionGroup
 from StepsLibrary import *
+from StepsLibrary_EXP import *
 from collections import defaultdict
 
 _author="Sebastian Szpakowski"

@@ -1,12 +1,9 @@
 ########################################################################################
 ## This file is a part of YAP package of scripts. https://github.com/shpakoo/YAP
 ## Distributed under the MIT license: http://www.opensource.org/licenses/mit-license.php
-## Copyright (c) 2011-2012 J.Craig Venter Institute.
+## Copyright (c) 2011-2013 Sebastian Szpakowski
 ########################################################################################
 
-
-
-#!/usr/bin/python
 #################################################
 ## rename anything with "uncultured" with a species that is most abundant in a cluster
 #################################################
