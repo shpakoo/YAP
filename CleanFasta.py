@@ -38,6 +38,58 @@ class	CommandWorker (Thread)  :
 	def	__str__(self):
 		otpt =  "%s\n%s" % (self.command, len(result))
 		return (otpt)
+	
+	
+	#################################################
+	### Iterator over input fasta file.
+	### Only reading when requested
+	### Useful for very large FASTA files
+	### with many sequences
+	
+class FastaParser:
+	def __init__ (self, x, quals=False):
+		self.filename = x
+		self.fp = open(x, "r")    
+		self.currline = "" 
+		self.currentFastaName = ""
+		self.currentFastaSequence = ""
+		self.lastitem=False    
+		if quals:
+			self.linesep=" "    
+		else:
+			self.linesep=""    
+	def __iter__(self):
+		return(self)    
+				
+		##### 
+	def next(self):
+		for self.currline in self.fp:
+			if self.currline.startswith(">"):
+				self.currline = self.currline[1:]
+				if self.currentFastaName == "":
+					self.currentFastaName = self.currline
+				else:
+					otpt = (self.currentFastaName.strip(), self.currentFastaSequence.strip())
+					self.currentFastaName = self.currline
+					self.currentFastaSequence = ""    
+					self.previoustell = self.fp.tell()
+					return (otpt)
+				
+			else:
+				self.addSequence(self.currline)    
+		
+		if not self.lastitem:
+			self.lastitem=True            
+			return (self.currentFastaName.strip(), self.currentFastaSequence.strip())
+		else:
+			raise StopIteration    
+									
+	def addSequence(self, x):
+				self.currentFastaSequence = "%s%s%s" % (self.currentFastaSequence,self.linesep, x.strip())            
+	def __str__():
+		return ("reading file: %s" %self.filename) 
+				
+	
 		
 #################################################
 ##		Functions
@@ -80,12 +132,18 @@ parser.add_option("-o", "--output", dest="fn_output",
 
 if options.fn_input != None :
 	print "cleaning up..."
-	C = list(SeqIO.parse(open(options.fn_input), "fasta"))
-	cleana = cleanup(C)
+	#C = list(SeqIO.parse(open(options.fn_input), "fasta"))
+	#cleana = cleanup(C)
 	output_handle = open(options.fn_output, "w")
-	SeqIO.write(cleana, output_handle, "fasta")
-	output_handle.close()
+	#SeqIO.write(cleana, output_handle, "fasta")
 	
+	for head, seq in FastaParser(options.fn_input):	
+		
+		seq = seq.replace(".", "").replace("-", "").replace(" ", "").replace("\n", "")
+		head = head.strip().split()[0]
+		
+		output_handle.write(">%s\n%s\n" % (head, seq))
+	output_handle.close()
 #################################################
 ##		Finish
 #################################################

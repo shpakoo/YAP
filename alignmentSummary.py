@@ -106,7 +106,7 @@ class	FastaParser:
 ##
 def	qsub(num):
 	batches.append(num)
-	command = "qsub -P %s -N tmp.%s.in -cwd -M %s -m a \"python %s -i tmp.%s.in -o tmp.%s.out -s -p REFSEQ \"" % (options.projectid, num,options.mailaddress, sys.argv[0], num, num   )
+	command = "qsub -P %s -N tmp.%s.in -cwd -M %s -m a \"%spython %s -i tmp.%s.in -o tmp.%s.out -s -p REFSEQ \"" % (options.projectid, num,options.mailaddress,options.binpath, sys.argv[0], num, num   )
 	
 	#command = "qsub -P %s -N tmp.%s.in -cwd -l \"fast\" -M sszpakow@jcvi.org -m a \"/home/sszpakow/bin/python %s -i tmp.%s.in -o tmp.%s.out -s -p REFSEQ \"" % (options.projectid, num, sys.argv[0], num, num   )
 	# 	   qsub -P 810013 -N tmp.2.in -cwd -l "fast" -M sszpakow@jcvi.org -m a "/home/sszpakow/bin/python /home/sszpakow/scripts/summarizeAlignment.py -i tmp.2.in -o tmp.2.out -s -p REFSEQ "
@@ -159,7 +159,10 @@ parser.add_option("-P", "--project", dest="projectid", default="810013",
                   help="projectid", metavar="num") 
 
 parser.add_option("-M", "--mail", dest="mailaddress", default="sszpakow@jcvi.org",
-                  help="email address", metavar="address")                  
+                  help="email address", metavar="address")   
+
+parser.add_option("-x", "--exepath", dest="binpath", default="",
+                  help="path to python binary", metavar="path")                
                   
 (options, args) = parser.parse_args()
 
