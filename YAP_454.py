@@ -304,7 +304,7 @@ def demultiplex():
                         "maxflows":"720"
                 }        
                 B = MothurStep("trim.flows", options.nodesize, oligoinputs, args, [A])
-                C = MothurSHHH([B])
+                C = MothurSHHH([B], options.nodesize)
                 D = FileMerger("fasta,name,qfile", [C])
                 
             #### deconvolution
@@ -324,7 +324,6 @@ def demultiplex():
             
             if  options.useflows:
                 DEMUX.append(E)
-            
             else:
                 #### generate trimming coordinates using LUCY
                 F = LUCYcheck(options.nodesize, [E])
@@ -334,7 +333,6 @@ def demultiplex():
                         
                 DEMUX.append(G)
     
-
     A1 = FileMerger("fasta,name,group,qfile", DEMUX)
     A2 = MatchGroupsToFasta(dict(), [A1])
     
@@ -508,8 +506,13 @@ def cleanup(input):
     s18a = AlignmentTrim(dict(), args, [s17])
             
     ####### remove sequence fragments, bad alignments (?) 
-    args = { "minlength" : "%s" % (options.minlength),
-             "force": "fasta,name,group"}
+    args = {}
+    if options.dynamic:
+        args = { "minlength" : "50" ,
+                 "force": "fasta,name,group"}
+    else:
+        args = { "minlength" : "%s" % (options.minlength),
+                 "force": "fasta,name,group"}
     s18b = MothurStep("screen.seqs", options.nodesize, dict(), args, [s18a])
     
     ### build a tree
@@ -618,11 +621,13 @@ def plotsAndStats(input):
     
     args = {"force" : "list", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.01"}
     s29 = MothurStep("rarefaction.single", options.nodesize, dict(), args, [s24])
-    #return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29])
     
-    args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.05"}
-    s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24]) 
-    return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29, s30])
+    if options.quickmode:
+        return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29])
+    else:
+        args = {"force" : "shared", "calc": "nseqs-sobs-simpson-invsimpson-chao-shannon-shannoneven-coverage", "freq": "0.05"}
+        s30 = MothurStep("rarefaction.single",options.nodesize, dict(), args, [s24]) 
+        return ([s23, s24, s25aa, s25bb, s26a, s27a, s28, s29, s30])
     
     
 #################################################
@@ -650,7 +655,7 @@ group.add_option("-Y", "--Yap", dest="mode", default="16S",
 group.add_option("-D", "--dynamic", dest="dynamic", action = "store_true", default=False,
                  help="""If specified, alignment will be scanned for primer locations and trimmed accordingly. Otherwise a database of known primers and trimming points will be used. [%default]""", metavar="#") 
 
-group.add_option("-d", "--thresh", dest="dynthresh", default=0.1, type="float",
+group.add_option("-d", "--thresh", dest="dynthresh", default=0.95, type="float",
                  help="""in conjunction with -D, otherwise this is ignored. This allows to specify how much of the alignment to keep using the per-base coverage. The [%default] value indicates that ends of the alignment are trimmed until a base has a coverage of [%default] * peak coverage.""", metavar="#") 
 
 group.add_option("-a", "--annotations", dest="dir_anno", default="/usr/local/devel/ANNOTATION/sszpakow/ANNOTATION/",
@@ -680,7 +685,7 @@ group.add_option("-F", "--useFlows", dest="useflows", action="store_true", defau
 parser.add_option_group(group)
 
 group = OptionGroup(parser, "Technical", description="could be useful sometimes")
-group.add_option("-C", "--NODESIZE", dest="nodesize", default=30,
+group.add_option("-C", "--NODESIZE", dest="nodesize", default=4,type="int",
                  help="maximum number of grid node's CPUs to use\n[%default]", metavar="#")
 parser.add_option_group(group)
     
