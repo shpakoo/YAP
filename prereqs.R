@@ -24,7 +24,7 @@ init = function()
 
 init()
 cran   = c("ade4", "RColorBrewer", "fdrtool", "randomForest", "vegan", "gplots", "multicore", "MASS")
-bioc = c("Biostrings", "ggplot2", "grid", "scales")
+bioc = c("Biostrings", "ggplot2", "grid", "scales", "multtest")
 
 for (p in cran)
 {	
