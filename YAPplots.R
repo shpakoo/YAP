@@ -189,7 +189,6 @@ assemblePhyloseq=function(path, annotation, distance)
 	
 	cat(".")
 	### create otu table
-	
 	### VERY slow! tapply,
 	### instead use python ~/DEVEL/YAP/scripts/OTUtableMaker.py --help 
 	### x = import_mothur(LL, mothur_group_file = GG, mothur_tree_file=NULL, cutoff = dist)
@@ -198,7 +197,6 @@ assemblePhyloseq=function(path, annotation, distance)
 	otumat = as.matrix(otutab[,-1])
 	colnames(otumat) = names(otutab)[-1]
 	rownames(otumat) = otutab[,1]
-	
 	
 	myotus = otu_table(otumat, taxa_are_rows=TRUE)
 		
@@ -261,10 +259,10 @@ getSafeTaxa=function(PHSQ)
 	return (levlist)
 }
 
-makeTREES=function( datain, taxa = c("Phylum", "Class") )
+makeTREES=function( datain, taxa = c("Phylum", "Class"), categories = names(sample_data(datain)) )
 {
 	pdf("TREES.pdf", height=10, width=10)
-	for (k in names(sample_data(datain)))
+	for (k in categories )
 	{
 		
 		cat(k, ":\t", sep="")
@@ -285,10 +283,10 @@ makeTREES=function( datain, taxa = c("Phylum", "Class") )
 	dev.off()
 	
 }
-makeHEATMAPS=function(datain, taxa=c("Phylum", "Class"), dists=c("none", "bray", "jaccard", "unifrac"), methods=c("DCA", "RDA", "NMDS", "PCoA", "MDS"))
+makeHEATMAPS=function(datain, taxa=c("Phylum", "Class"), dists=c("none", "bray", "jaccard", "unifrac"), methods=c("DCA", "RDA", "NMDS", "PCoA", "MDS"), categories = names(sample_data(datain)))
 {
 	pdf("HEATMAPS.pdf", height=10, width=10)
-	for (k in names(sample_data(datain)))
+	for (k in categories)
 	{
 		cat(k, ":\t", sep="")
 		for ( taxon in taxa)
@@ -320,6 +318,195 @@ makeHEATMAPS=function(datain, taxa=c("Phylum", "Class"), dists=c("none", "bray",
 	dev.off()
 }
 
+makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), constraints = names(sample_data(datain)) )
+{
+	
+	labS = ifelse (length(subsets)<=2, paste(subsets, collapse="-", sep="-"), length(subsets))
+	labC = ifelse (length(constraints)<=2, paste(constraints, collapse="-", sep="-"), length(constraints))
+	labT = ifelse (length(taxa)<=2, paste(taxa, collapse="-", sep="-"), length(taxa))
+	
+	filename = paste("ORDconst", labS, labT, labC, minotusize, color, shape, "pdf", sep="." )	
+	pdf(filename, height=20, width=10)
+	
+	for (k in subsets)
+	{
+		cat ("__________________________\n")
+		cat(k, ":\t", sep="")
+		for ( taxon in taxa)
+		{
+			cat (taxon, "\n", sep="")
+			
+			tokeep= sample_data(datain)[,k]
+			tokeep = tokeep[tokeep != ""]
+			tmp.samples = prune_samples(sample_names(tokeep), x)
+			#print (tmp.samples)
+			
+			### remove empty and singletons taxa for given subset samples
+			tokeep = taxa_sums(tmp.samples) 
+			tokeep = tokeep[tokeep>=minotusize]
+			tmp.samples.nonempty = prune_taxa(names(tokeep), tmp.samples)
+			#print (tmp.samples.nonempty)
+			
+			
+			
+			# for some reason the object needs to be accessible globally...
+			tmp = tmp.samples.nonempty
+			assign( "tmp", tmp, envir = .GlobalEnv)
+			print (tmp)
+			
+			### constrained correspondence analysis
+			for (const in constraints)
+			{
+				if (k != const)
+				{
+					
+					myform = paste("tmp ~ ", const, sep="" )
+					cat(myform)
+					tmp.ORD <- ordinate(as.formula(myform), "CCA")
+					
+					desc = paste("Correspondence Analysis, constrained by ", const, sep="" )
+					title = paste("All taxa\nSubset: \"", k, "\" with n=",nsamples(tmp), "\n", desc, sep="")
+					
+					p1 = plot_ordination(tmp, tmp.ORD, type="samples", shape=shape, color=color, label=k, title = title )	
+					p1 = p1 + geom_line() + geom_point(size=2) 
+					
+					p2 = plot_ordination(tmp, tmp.ORD, type="taxa", color = taxon, title = title )	
+					
+					multiplot(p1, p2, cols=1)
+					
+					
+					p = plot_ordination(tmp, tmp.ORD, type="taxa", color=taxon) 
+					
+					wrappingform = as.formula(paste("~", availablelevels[which(availablelevels==taxon)-1]))
+					print (p + facet_wrap(wrappingform, ncol=3))
+					
+					cat("\t")	
+					
+				}	
+				
+			}
+			
+		}	
+		cat("\n")
+	}
+	dev.off()
+}
+
+makeORDINATION=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), methods = c("CCA", "DCA", "DPCoA" , "RDA", "NMDS", "PCoA") )
+{
+	
+	descs = list()
+	descs["CCA"] = "(unconstrained) Correspondence Analysis"
+	descs["DCA"] = "Detrended Correspondence Analysis"
+	descs["DPCoA"] = "Double Principal Coordinate Analysis"
+	descs["RDA"] = "Redundancy Analysis / Principal Component Analysis"
+	descs["NMDS"] = "Non-Metric Multidimensional Scaling "
+	descs["PCoA"] = "Principal Coordinate Analysis"
+	
+	
+	labS = ifelse (length(subsets)<=2, paste(subsets, collapse="-", sep="-"), length(subsets))
+	labT = ifelse (length(taxa)<=2, paste(taxa, collapse="-", sep="-"), length(taxa))
+	labM = ifelse (length(methods)<=2, paste(methods, collapse="-", sep="-"), length(methods))
+	
+	filename = paste("ORDuncon.", labS, labT, labM, minotusize, color, shape, "pdf", sep="." )	
+	pdf(filename, height=20, width=10)
+	
+	
+	for (k in subsets	)
+	{		
+		cat ("__________________________\n")
+		cat(k, ":\t", sep="")
+		for ( taxon in taxa)
+		{
+			cat (taxon, "\n", sep="")
+			#print (x)
+			
+			tokeep= sample_data(datain)[,k]
+			tokeep = tokeep[tokeep != ""]
+			tmp.samples = prune_samples(sample_names(tokeep), x)
+			#print (tmp.samples)
+			
+			### remove empty and singletons taxa for given subset samples
+			tokeep = taxa_sums(tmp.samples) 
+			tokeep = tokeep[tokeep>=minotusize]
+			tmp.samples.nonempty = prune_taxa(names(tokeep), tmp.samples)
+			#print (tmp.samples.nonempty)
+			
+			# for some reason the object needs to be accessible globally...
+			tmp = tmp.samples.nonempty
+			assign( "tmp", tmp, envir = .GlobalEnv)
+			print (tmp)
+			
+			### unconstrained  analyses	
+			
+			for (m in methods)
+			{
+				tmp.ORD <- ordinate(tmp, m)
+				cat(m)
+				
+				desc=descs[names(descs)==m]
+				title = paste("All taxa\nSubset: \"", k, "\" with n=",nsamples(tmp), "\n", desc, sep="")
+				
+				p1 = plot_ordination(tmp, tmp.ORD, type="samples", shape=shape, color=color, label="SampleID", title = title )	
+				p1 = p1 + geom_line() + geom_point(size=5) 
+				
+				p2 = plot_ordination(tmp, tmp.ORD, type="taxa", color = taxon, title = title )	
+				
+				multiplot(p1, p2, cols=1)
+				
+				p = plot_ordination(tmp, tmp.ORD, type="taxa", color=taxon) 
+				wrappingform = as.formula(paste("~", availablelevels[which(availablelevels==taxon)-1]))
+				
+				
+				print (p + facet_wrap(wrappingform, ncol=3))
+				
+				cat("\t")
+				
+				
+#				p <- plot_ordination(tmp, tmp.ORD, type="split", color=k, label=k, title = title )	
+#				print (p)
+#				
+#				p <- plot_ordination(tmp, tmp.ORD, type="samples", color=k, label=k, title = title ) + geom_line() + geom_point(size=5)		
+#				print (p)
+				
+				# # p <- plot_ordination(tmp, tmp.ORD, type="species", color=taxon, label=NULL, title = title ) 
+				# # print (p)
+				
+				# wrappingform = as.formula(paste("~", availablelevels[which(availablelevels==taxon)-1]))
+				
+				# p <- plot_ordination(tmp, tmp.ORD, type="taxa", color=taxon) 
+				# print (p + facet_wrap(wrappingform, nrow=3))
+				
+				#print (ggplot(p$data, aes(x=CA1, y=CA2, color=Phylum)) + stat_density() )
+				
+				###for the purpose of plotting the contour remove singleton classes
+				# xlim_ = range(p$data$CA1)
+				# ylim_ = range(p$data$CA2)
+				# p$data = p$data[p$data[, taxon] %in% names(table(p$data[, taxon])[table(p$data[,taxon])>1]), ]
+				
+				
+				# print (ggplot(p$data, aes(x=CA1, y=CA2, color=Phylum)) + xlim(xlim_) + ylim(ylim_) + geom_density2d() + facet_wrap(~Phylum, nrow=3) )
+				# # print (ggplot(p$data, aes(x=CA1, y=CA2, color=Phylum)) + stat_binhex(bins=100, na.rm=T) )
+				#print (ggplot(p$data, aes(x=CA1, y=CA2, color=Phylum)) + stat_binhex(bins=100, na.rm=T) + facet_wrap(~Phylum, nrow=3))
+				
+				
+				# tmp.ORD <- ordinate(tmp, "DCA")
+				# desc="Detrended Correspondence Analysis"
+				# title = paste("All taxa\nSubset: \"", k, "\" with n=",nsamples(tmp), "\n", desc, sep="")
+				
+				# p <- plot_ordination(tmp, tmp.ORD, type="split", color=k, label=k, title = title )	
+				# print (p)
+				
+				# p <- plot_ordination(tmp, tmp.ORD, type="taxa", color=taxon) 
+				# print (p + facet_wrap(wrappingform, nrow=3))
+			}	
+			
+		}	
+		cat("\n")
+	}		
+	dev.off()
+}
+
 ################################################################################
 
 ### ln -s ../*OUTPUT_6*/*.list ./
@@ -328,15 +515,15 @@ makeHEATMAPS=function(datain, taxa=c("Phylum", "Class"), dists=c("none", "bray",
 ### ln -s ../*OUTPUT_8*/*PHYLOTREES*/*.ph ./
 ### ~/DEVEL/YAP/scripts/OTUtableMaker.py --help 
 
-annotation = "/usr/local/projects/T1D-CNMC/sszpakow/BATCH_01_16S/annotation3.csv"
-distance = 0.03
-x = assemblePhyloseq("./", annotation, distance)
+#annotation = "/usr/local/projects/T1D-CNMC/sszpakow/BATCH_01_16S/annotation3.csv"
+#distance = 0.03
+#x = assemblePhyloseq("./", annotation, distance)
 
 ################################################################################
 
 
-makeTREES(x)
-makeHEATMAPS(x)
+#makeTREES(x)
+#makeHEATMAPS(x)
 
 
 ########################################################################################
