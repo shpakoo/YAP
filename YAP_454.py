@@ -669,7 +669,7 @@ group.add_option("-g", "--mingroupsize", dest="mingroupmembers", default=100, ty
                  help="after demultiplexing, discard groups with fewer reads than #\n[%default]", metavar="#")
     
 group.add_option("-q", "--quick", dest="quickmode", action = "store_true", default=False,
-                 help="""If specified, only single, reference DB based chimera checking will be used. [%default]""", metavar="#") 
+                 help="""Quick mode. If specified, only single, reference DB based chimera checking will be used. Furthermore rarefaction of individual samples is not performed. [%default]""", metavar="#") 
               
 group.add_option("-x", "--strict", dest="strictlevel", default=2, type="int",
                  help="""how strict to be at demultiplexing: 

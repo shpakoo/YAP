@@ -197,7 +197,7 @@ class	BufferedOutputHandler(Thread):
 			
 			msg.attach(MIMEText(msgtext))
 			
-			files = ["workflow.svgz"]
+			files = ["workflow.pdf"]
 			for f in files:
 				try:
 					part = MIMEBase('application', "octet-stream")
@@ -1485,6 +1485,7 @@ class	FileMerger(DefaultStep):
 		
 	def	performStep(self):
 		tasks = list()
+		
 		for t in self.getInputValue("types").strip().split(","):
 			files = self.find(t)
 			if len(files)>0 and len(files)<25:
@@ -1503,7 +1504,7 @@ class	FileMerger(DefaultStep):
 		for task in tasks:
 			task.wait()
 			time.sleep(1)
-
+			
 class	FileSort(DefaultStep):
 	def __init__(self, TYPES, PREV):
 		ARGS = 	{"types": TYPES}		

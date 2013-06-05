@@ -16,7 +16,7 @@ library(vegan)
 
 ########################################################################################
 
-FFP.mothur=function(infile, tag="")
+FFP.mothur=function(infile, annotation, tag="")
 {
 
 	origdataset = read.table(infile, sep="\t", as.is=T, header=T)
@@ -178,6 +178,17 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 	}
 }
 
+
+openAnno = function(annotation, as.is=TRUE)
+{
+	anno = read.csv(annotation, as.is=as.is, header=TRUE)
+	anno = anno[, which(names(anno)=="SampleID"):ncol(anno)]
+	anno = aggregate(anno, by=list(anno$SampleID), function(x) { paste(unique(x), collapse=",", sep=",") } )[,-1]
+	samplenames = anno[,"SampleID"]
+	row.names(anno) <- samplenames
+	return (anno)
+}
+
 assemblePhyloseq=function(path, annotation, distance)
 {
 	cat(".")
@@ -187,13 +198,17 @@ assemblePhyloseq=function(path, annotation, distance)
 	TR = files[regexpr("ph$", files )>-1 & regexpr(paste(distance), files )>-1] 
 	TA= files[regexpr("phylotax$", files )>-1 & regexpr(paste(distance), files )>-1]
 	
+	print (OT)
+	print (TR)
+	print (TA)
+	
 	cat(".")
 	### create otu table
 	### VERY slow! tapply,
 	### instead use python ~/DEVEL/YAP/scripts/OTUtableMaker.py --help 
 	### x = import_mothur(LL, mothur_group_file = GG, mothur_tree_file=NULL, cutoff = dist)
 		
-	otutab = read.table(OT, sep="\t", header = TRUE)
+	otutab = read.table(paste(path, OT, sep="/"), sep="\t", header = TRUE)
 	otumat = as.matrix(otutab[,-1])
 	colnames(otumat) = names(otutab)[-1]
 	rownames(otumat) = otutab[,1]
@@ -202,7 +217,7 @@ assemblePhyloseq=function(path, annotation, distance)
 		
 	### established taxonomy
 	cat(".")
-	taxa = read.table(TA, as.is=T, sep="\t", header=TRUE)
+	taxa = read.table(paste(path, TA, sep="/"), as.is=T, sep="\t", header=TRUE)
 	OTUIDS=taxa[,1]
 	TAXIDS=names(taxa)
 	taxa$Species[is.na(taxa$Species)] = OTUIDS[is.na(taxa$Species)]
@@ -215,21 +230,25 @@ assemblePhyloseq=function(path, annotation, distance)
 		
 	### sample information
 	cat(".")
-	anno = read.csv(annotation, as.is=TRUE, header=TRUE)
-	anno = anno[, which(names(anno)=="SampleID"):ncol(anno)]
-	anno = aggregate(anno, by=list(anno$SampleID), function(x) { paste(unique(x), collapse=",", sep=",") } )[,-1]
-	
-	samplenames = anno[,"SampleID"]
-	row.names(anno) <- samplenames
+	anno = openAnno(annotation)
 	anno = sample_data(anno)
 	
-	### attach the tree
-	cat(".")
-	TR = read.tree(TR)
-	TR = root (TR, TR$tip.label[regexpr("e_coli", TR$tip.label)>-1], resolve.root=TRUE)
-
-	x = phyloseq(myotus, anno, taxa, TR)
 	
+	### attach the tree
+	if ( length(TR) >0 )
+	{
+		cat(".")
+		TR = read.tree(paste(path, TR, sep="/"))
+		TR = root (TR, TR$tip.label[regexpr("thermococcus_SILVA_ABSV01001619", TR$tip.label)>-1], resolve.root=TRUE)
+		x = phyloseq(myotus, anno, taxa, TR)
+	}
+	else
+	{	
+		cat("x")
+		x = phyloseq(myotus, anno, taxa)
+	}
+	cat ("\n")
+	print (x)
 	cat("\n")
 	return (x)
 	
@@ -318,7 +337,7 @@ makeHEATMAPS=function(datain, taxa=c("Phylum", "Class"), dists=c("none", "bray",
 	dev.off()
 }
 
-makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), constraints = names(sample_data(datain)) )
+makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), constraints = names(sample_data(datain)), height=20, width=10 )
 {
 	
 	labS = ifelse (length(subsets)<=2, paste(subsets, collapse="-", sep="-"), length(subsets))
@@ -326,7 +345,7 @@ makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c(
 	labT = ifelse (length(taxa)<=2, paste(taxa, collapse="-", sep="-"), length(taxa))
 	
 	filename = paste("ORDconst", labS, labT, labC, minotusize, color, shape, "pdf", sep="." )	
-	pdf(filename, height=20, width=10)
+	pdf(filename, height=height, width=width)
 	
 	for (k in subsets)
 	{
@@ -368,17 +387,18 @@ makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c(
 					title = paste("All taxa\nSubset: \"", k, "\" with n=",nsamples(tmp), "\n", desc, sep="")
 					
 					p1 = plot_ordination(tmp, tmp.ORD, type="samples", shape=shape, color=color, label=k, title = title )	
-					p1 = p1 + geom_line() + geom_point(size=2) 
+					p1 = p1  + geom_point(size=4) + stat_density2d(aes(alpha=..density..), geom="raster", contour=FALSE) +  geom_line() + geom_point(size=3)
 					
-					p2 = plot_ordination(tmp, tmp.ORD, type="taxa", color = taxon, title = title )	
+					p2 = plot_ordination(tmp, tmp.ORD, type="scree", color = taxon, title = title )	
+					p2 = p2 + theme(legend.position="none")
 					
 					multiplot(p1, p2, cols=1)
 					
 					
-					p = plot_ordination(tmp, tmp.ORD, type="taxa", color=taxon) 
+					p = plot_ordination(tmp, tmp.ORD, type="taxa", color=taxon)
 					
 					wrappingform = as.formula(paste("~", availablelevels[which(availablelevels==taxon)-1]))
-					print (p + facet_wrap(wrappingform, ncol=3))
+					print (p + stat_density2d(aes(alpha=..density..), geom="raster", contour=FALSE, drop=TRUE) +  facet_wrap(wrappingform, ncol=3))
 					
 					cat("\t")	
 					
@@ -392,7 +412,7 @@ makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c(
 	dev.off()
 }
 
-makeORDINATION=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), methods = c("CCA", "DCA", "DPCoA" , "RDA", "NMDS", "PCoA") )
+makeORDINATION=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), methods = c("CCA", "DCA", "DPCoA" , "RDA", "NMDS", "PCoA"), height=20, width=10 )
 {
 	
 	descs = list()
@@ -409,7 +429,7 @@ makeORDINATION=function(datain, shape="status", color="status", minotusize = 2, 
 	labM = ifelse (length(methods)<=2, paste(methods, collapse="-", sep="-"), length(methods))
 	
 	filename = paste("ORDuncon.", labS, labT, labM, minotusize, color, shape, "pdf", sep="." )	
-	pdf(filename, height=20, width=10)
+	pdf(filename, height=height, width=width)
 	
 	
 	for (k in subsets	)
