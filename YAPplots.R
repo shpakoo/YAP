@@ -189,7 +189,65 @@ openAnno = function(annotation, as.is=TRUE)
 	return (anno)
 }
 
-assemblePhyloseq=function(path, annotation, distance)
+taxoLogic=function(x)
+{
+	initlength = length(x)	
+	last = x[initlength]
+	
+	print (x)
+	x = x[regexpr("classified",x) == - 1 ]
+	x = x[regexpr("sub_",x) == - 1 & regexpr("_of_",x) == - 1]
+	print (x)
+	
+	### if the last item is "unclassified" change it to more meaningful label
+	### otherwise keep it
+	if (length(x)!= initlength & x[length(x)] != last)
+	{
+		last = x[length(x)]
+		lastname = names(last)
+		label = paste("[", lastname," ", last,"]",  sep="")
+	}
+	else
+	{
+		label = x[length(x)]
+	}
+	
+#	if (regexpr("sub-", label)>-1)
+#	{
+#		label = substr(label, regexpr("_of_", label)+4, nchar(label))
+#	}
+	
+	return(label)
+}
+
+fixLabels=function(datain)
+{
+	x = names(datain)
+	
+	x = x[-1]
+	x = x[-length(x)]
+	x = x[-length(x)]
+	
+	x = rev(x)
+
+	for (rankid in x)
+	{
+		tmp = datain[,2:which (names(datain)==rankid)]
+		#print (ncol(tmp))
+		if (!is.null(ncol(tmp)))
+		{
+			old = datain[,rankid]
+			datain[,rankid] = apply(tmp, 1, taxoLogic)	
+			new = datain[,rankid]
+			#print (cbind(old, new))
+		}
+
+	}
+	return (datain)
+	
+}
+
+assemblePhyloseq=function(path, annotation, distance, relabelunclassified=TRUE)
 {
 	cat(".")
 	
@@ -221,11 +279,18 @@ assemblePhyloseq=function(path, annotation, distance)
 	OTUIDS=taxa[,1]
 	TAXIDS=names(taxa)
 	taxa$Species[is.na(taxa$Species)] = OTUIDS[is.na(taxa$Species)]
+	
+	if (relabelunclassified)
+	{
+		taxa = fixLabels(taxa)
+	}
+	
 	taxa = as.matrix(taxa[,-1])
 	row.names(taxa)=OTUIDS
 		
 	tokeep = apply(taxa, 2, function(x) { sum(is.na(x))!=length(x) } )  
 	taxa = taxa[,tokeep]
+	#print (taxa[1:10,])
 	taxa = tax_table(taxa)
 		
 	### sample information
