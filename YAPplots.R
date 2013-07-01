@@ -194,10 +194,10 @@ taxoLogic=function(x)
 	initlength = length(x)	
 	last = x[initlength]
 	
-	print (x)
+	#print (x)
 	x = x[regexpr("classified",x) == - 1 ]
 	x = x[regexpr("sub_",x) == - 1 & regexpr("_of_",x) == - 1]
-	print (x)
+	#print (x)
 	
 	### if the last item is "unclassified" change it to more meaningful label
 	### otherwise keep it

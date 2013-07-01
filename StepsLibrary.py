@@ -1583,16 +1583,20 @@ class	MakeNamesFile(DefaultStep):
 	 	self.start()
 		
 	def	performStep(self):
-		f = self.find("fasta")[0]
-		self.message("Creating 'names' file for sequences in {0}".format( f))
-
-		newname = f.strip().split(".")[:-1]
-		newname = "%s.names" % (".".join(newname)) 
-		otpt = open("%s/%s" % (self.stepdir,newname ), 'w')
-		for head, seq in FastaParser("%s/%s" % (self.stepdir, f)):
-			head = head.strip().split()[0]
-			otpt.write("%s\t%s\n" % (head, head))
-		otpt.close()	
+		files = self.find("fasta")
+		for f in files:
+			self.message("Creating 'names' file for sequences in {0}".format( f))
+	
+			newname = f.strip().split(".")[:-1]
+			newname = "%s.names" % (".".join(newname)) 
+			otpt = open("%s/%s" % (self.stepdir,newname ), 'w')
+			for head, seq in FastaParser("%s/%s" % (self.stepdir, f)):
+				head = head.strip().split()[0]
+				otpt.write("%s\t%s\n" % (head, head))
+			otpt.close()	
+			
+		if len(files)==0:
+			self.message("No files to generate NAMES...")		
 			
 class	MakeGroupsFile(DefaultStep):
 	def __init__(self, PREV, id):
@@ -1606,16 +1610,19 @@ class	MakeGroupsFile(DefaultStep):
 	 	self.start()
 		
 	def	performStep(self):
-		f = self.find("fasta")[0]
-		id = self.getInputValue("groupid")
-		self.message("Creating 'groups' file; '{0}' for sequences in {1}".format(id, f))
-		newname = f.strip().split(".")[:-1]
-		newname = "%s.groups" % (".".join(newname)) 
-		otpt = open("%s/%s" % (self.stepdir, newname ), 'w')
-		for head, seq in FastaParser("%s/%s" % (self.stepdir, f)):
-			head = head.strip().split()[0]
-			otpt.write("%s\t%s\n" % (head, id))
-		otpt.close()			
+		files = self.find("fasta")
+		for f in files:
+			id = self.getInputValue("groupid")
+			self.message("Creating 'groups' file; '{0}' for sequences in {1}".format(id, f))
+			newname = f.strip().split(".")[:-1]
+			newname = "%s.groups" % (".".join(newname)) 
+			otpt = open("%s/%s" % (self.stepdir, newname ), 'w')
+			for head, seq in FastaParser("%s/%s" % (self.stepdir, f)):
+				head = head.strip().split()[0]
+				otpt.write("%s\t%s\n" % (head, id))
+			otpt.close()
+		if len(files)==0:
+			self.message("No files to generate GROUPS...")			
 
 class	MakeQualFile(DefaultStep):
 	def __init__(self, PREV, q):
