@@ -405,6 +405,8 @@ makeHEATMAPS=function(datain, taxa=c("Phylum", "Class"), dists=c("none", "bray",
 makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), constraints = names(sample_data(datain)), height=20, width=10 )
 {
 	
+	
+	availablelevels = getSafeTaxa(datain)
 	labS = ifelse (length(subsets)<=2, paste(subsets, collapse="-", sep="-"), length(subsets))
 	labC = ifelse (length(constraints)<=2, paste(constraints, collapse="-", sep="-"), length(constraints))
 	labT = ifelse (length(taxa)<=2, paste(taxa, collapse="-", sep="-"), length(taxa))
@@ -429,7 +431,7 @@ makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c(
 			tokeep = taxa_sums(tmp.samples) 
 			tokeep = tokeep[tokeep>=minotusize]
 			tmp.samples.nonempty = prune_taxa(names(tokeep), tmp.samples)
-			#print (tmp.samples.nonempty)
+			print (tmp.samples.nonempty)
 			
 			
 			
@@ -452,7 +454,7 @@ makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c(
 					title = paste("All taxa\nSubset: \"", k, "\" with n=",nsamples(tmp), "\n", desc, sep="")
 					
 					p1 = plot_ordination(tmp, tmp.ORD, type="samples", shape=shape, color=color, label=k, title = title )	
-					p1 = p1  + geom_point(size=4) + stat_density2d(aes(alpha=..density..), geom="raster", contour=FALSE) +  geom_line() + geom_point(size=3)
+					#p1 = p1  + geom_point(size=4) + stat_density2d(aes(alpha=..density..), geom="raster", contour=FALSE) +  geom_line() + geom_point(size=3)
 					
 					p2 = plot_ordination(tmp, tmp.ORD, type="scree", color = taxon, title = title )	
 					p2 = p2 + theme(legend.position="none")
@@ -479,7 +481,7 @@ makeCCA=function(datain, shape="status", color="status", minotusize = 2, taxa=c(
 
 makeORDINATION=function(datain, shape="status", color="status", minotusize = 2, taxa=c("Phylum", "Class"),  subsets = names(sample_data(datain)), methods = c("CCA", "DCA", "DPCoA" , "RDA", "NMDS", "PCoA"), height=20, width=10 )
 {
-	
+	availablelevels = getSafeTaxa(datain)
 	descs = list()
 	descs["CCA"] = "(unconstrained) Correspondence Analysis"
 	descs["DCA"] = "Detrended Correspondence Analysis"
