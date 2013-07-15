@@ -116,11 +116,11 @@ for head, seq in FastaParser(args.fn_fasta):
 
     if keep:
         if tmp in filters and keep:
-            otpt.write(">%s\n%s" % (head, seq))
+            otpt.write(">%s\n%s\n" % (head, seq))
             counter+= 1
     else:        
          if not (tmp in filters) :
-            otpt.write(">%s\n%s" % (head, seq))
+            otpt.write(">%s\n%s\n" % (head, seq))
             counter+= 1
             
         
