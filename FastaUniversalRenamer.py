@@ -93,8 +93,8 @@ otptmap = open(newfileMAPPING, "w")
 
 for head, seq in FastaParser(args.fn_fasta):
     newhead =  hashlib.sha256(head).hexdigest()
-    otptseq.write(">x{2}{0}\n{1}\n".format(newhead,seq, args.prefix) )
-    otptmap.write("x{2}{0}\t{1}\n".format(newhead, head, args.prefix) )          
+    otptseq.write(">{2}{0}\n{1}\n".format(newhead,seq, args.prefix) )
+    otptmap.write("{2}{0}\t{1}\n".format(newhead, head, args.prefix) )          
     
 otptseq.close()
 otptmap.close()

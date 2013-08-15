@@ -46,8 +46,7 @@ class GeneralPurposeParser:
                     
     def    __str__(self):
         return "%s [%s]\n\t%s" % (self.filename, self.linecounter, self.currline)
-          
-        
+                
 #################################################
 ##        Functions
 ##

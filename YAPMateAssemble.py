@@ -233,7 +233,8 @@ for sample in info.getSamples():
 	
 		ARGS = 	{
 					"-p" : "no" ,
-					"--cpus": "10", 
+					#### changed from 10 to 4
+					"--cpus": "4", 
 					"-m" : "0.5",
 					"--no-progress": ""				
 		}

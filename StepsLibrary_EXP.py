@@ -732,15 +732,17 @@ class	ContigCoverageUpdate(DefaultStep):
 		fasta = self.find("fasta")
 		tasks = list()
 		for f in fasta:
-			if f.find("contigs")>0:
-				for t in table:
-					if ".".join(f.split(".")[1:-1]) in t:
+			#self.message(f)
+			if f.find("contigs")>-1:
+				for t in table: 
+					if ".".join(f.split(".")[1:-3]) in t:
 						k = "%spython %sContigCoverageUpdate.py %s  %s" % (binpath, scriptspath, t, f)
 						self.message(k)
-						task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir)
+						task = GridTask(template="pick", name=self.stepname, command=k, cwd = self.stepdir, debug=False)
 						tasks.append(task)
 		for t in tasks:
 			t.wait()
+		#self.failed=True	
 
 class	ORFCoverage(DefaultStep):
 	def __init__(self, INS, ARGS, PREV):
