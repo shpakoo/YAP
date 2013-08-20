@@ -2122,7 +2122,7 @@ def	init(id, e, maxnodes = 250, update=0.1):
 	
 	__projectid__ = id
 	__email__ = e
-	__admin__ = 'sszpakow@jcvi.org'
+	__admin__ = 'sszpakow@gmail.com'
 	
 	BOH = BufferedOutputHandler()
 	MOTHUR = MothurCommandInfo(path=mothurpath)
